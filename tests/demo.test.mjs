@@ -281,3 +281,20 @@ test("category image files exist and stay isolated by slug", () => {
   assert.match(DIRECTION_IMAGES.geometry.alt, /лонжерон/i);
   assert.match(DIRECTION_IMAGES.wheels.alt, /колес/i);
 });
+
+test("photo gallery thumbnails keep a 120px grid and viewer can upscale", () => {
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(app, /class="media-card thumb"/);
+  assert.match(app, /class="media-thumb thumb-btn"/);
+  assert.match(css, /\.photo-gallery\s*\{[^}]*minmax\(120px, 1fr\)/s);
+  assert.match(css, /\.media-card,[\s\S]*?margin:\s*0/);
+  assert.match(css, /\.media-thumb,[\s\S]*?display:\s*block/);
+  assert.match(css, /\.media-thumb,[\s\S]*?padding:\s*0/);
+  assert.match(css, /\.media-thumb,[\s\S]*?min-width:\s*0/);
+  assert.match(css, /aspect-ratio:\s*4 \/ 3/);
+  assert.match(css, /\.photo-viewer img\s*\{[^}]*width:\s*min\(90vw, 576px\)/s);
+  assert.match(css, /\.photo-viewer img\s*\{[^}]*max-height:\s*75vh/s);
+  assert.match(css, /\.photo-viewer img\s*\{[^}]*object-fit:\s*contain/s);
+  assert.equal(css.includes("minmax(96px, 1fr)"), false);
+});

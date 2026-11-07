@@ -707,8 +707,8 @@ async function hydrateMedia(carId, slug, root = document) {
         ? photos
             .map((item) => {
               const url = objectUrlFor(item);
-              return `<figure class="thumb">
-          <button type="button" class="thumb-btn" data-view-photo="${item.id}">
+              return `<figure class="media-card thumb">
+          <button type="button" class="media-thumb thumb-btn" data-view-photo="${item.id}">
             <img src="${url}" alt="${escapeHtml(item.name)}">
           </button>
           <figcaption>${escapeHtml(item.name)}</figcaption>
