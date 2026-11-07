@@ -423,9 +423,11 @@ function folderPanelHTML(carId, slug) {
     }</p>
     ${directionNotesHTML(carId, slug, editable)}
     ${mediaSectionsHTML(carId, slug, editable)}
-    <h3>Узлы направления</h3>
-    <p class="hint">Откройте нужный пункт — все ${direction.checkpoints.length} сразу не показаны.</p>
-    ${nodes}
+    <details class="check-list" open>
+      <summary>Список проверок — ${direction.checkpoints.length} узлов</summary>
+      <p class="hint">Откройте нужный пункт — все ${direction.checkpoints.length} сразу не показаны.</p>
+      ${nodes}
+    </details>
     ${state.role === "master" && editable ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}`;
 }
 
@@ -448,6 +450,21 @@ function printAllHTML(carId, dirs) {
       return `<section><h3>${directionTitle(direction.slug, direction.name)}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul></section>`;
     })
     .join("")}</div>`;
+}
+
+function directionNavHTML(carId, dirs) {
+  if (!dirs.length) return "";
+  const items = dirs
+    .map((direction) => {
+      const title = directionTitle(direction.slug, direction.name);
+      const open = openDirs.has(direction.slug);
+      return `<li><button type="button" class="dir-jump-btn${open ? " is-current" : ""}" data-jump-dir="${direction.slug}">${escapeHtml(title)}</button></li>`;
+    })
+    .join("");
+  return `<nav class="dir-jump no-print" aria-label="Разделы диагностики">
+    <h3>Разделы диагностики</h3>
+    <ol>${items}</ol>
+  </nav>`;
 }
 
 function directionPicker(carId, dirs, scores, unpublished) {
@@ -537,7 +554,8 @@ function renderCar(id, route = parseRoute()) {
       ${unpublished ? "" : highlightsHTML(id)}
       ${!unpublished && conclusion ? `<section class="highlights"><h2>Заключение</h2><p>${escapeHtml(conclusion)}</p></section>` : ""}
       ${unpublished ? "" : conditionLegend()}
-      ${unpublished ? "" : `<h2>Диагностика по направлениям</h2><p class="lead">Нажмите картинку, чтобы открыть описание, фото, видео и список узлов.</p>`}
+      ${unpublished ? "" : `<h2>Диагностика по направлениям</h2><p class="lead">Нажмите картинку, чтобы открыть описание, фото, видео и список узлов. Ходовая часть, двигатель и электроприборы — отдельные разделы в начале списка.</p>`}
+      ${unpublished ? "" : directionNavHTML(id, dirs)}
       ${unpublished ? "" : directionPicker(id, dirs, scores, unpublished)}
       ${unpublished ? "" : `<p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>`}
       ${unpublished ? "" : printAllHTML(id, dirs)}
@@ -696,6 +714,16 @@ function bindPicker() {
   document.querySelectorAll("[data-select-dir]").forEach((button) => {
     button.addEventListener("click", () => {
       toggleDirection(button.getAttribute("data-select-dir"));
+    });
+  });
+}
+
+function bindDirJump() {
+  document.querySelectorAll("[data-jump-dir]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const slug = button.getAttribute("data-jump-dir");
+      if (slug && !openDirs.has(slug)) toggleDirection(slug);
+      document.querySelector(`[data-direction-item="${slug}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 }
@@ -877,6 +905,7 @@ function bindFieldRoot(root) {
 function bind() {
   bindDisclosure();
   bindPicker();
+  bindDirJump();
   bindFieldRoot(document);
   bindMediaSection(document);
   document.getElementById("modeToggle")?.addEventListener("click", () => {

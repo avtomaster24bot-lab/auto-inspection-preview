@@ -244,6 +244,12 @@ test("ensureCarShape adds direction notes without wiping scores", () => {
   assert.equal(next.directionNotes.engine.internalComment, "");
   assert.equal(next.results.hodovaya["amort-rear"].publicComment, originalComment);
   assert.notEqual(originalComment, "");
+  const electricScore = next.publishedSnapshot.scores.directionScores.find((item) => item.id === "electric");
+  const kept = electricScore.score;
+  electricScore.name = "Электрика";
+  ensureCarShape(next);
+  assert.equal(electricScore.name, "Электроприборы и электрооборудование");
+  assert.equal(electricScore.score, kept);
 });
 
 import { existsSync } from "node:fs";
@@ -310,8 +316,10 @@ test("category details sit under their own card and toggle independently", () =>
   assert.match(picker, /aria-controls=/);
   assert.equal(picker.includes('id="dirExpand"'), false);
   assert.equal(app.includes('id="dirExpand"'), false);
-  assert.equal(app.includes("scrollIntoView"), false);
+  const toggleFn = app.slice(app.indexOf("function toggleDirection"), app.indexOf("function bindPicker"));
+  assert.equal(toggleFn.includes("scrollIntoView"), false);
   assert.match(app, /function toggleDirection/);
+  assert.match(app, /function bindDirJump/);
   assert.equal(panelDomId("primer-sedan", "hodovaya"), "dir-panel-primer-sedan-hodovaya");
   assert.notEqual(panelDomId("primer-sedan", "hodovaya"), panelDomId("primer-sedan", "engine"));
   const first = toggleOpenDir(new Set(), "hodovaya");
@@ -324,4 +332,38 @@ test("category details sit under their own card and toggle independently", () =>
   assert.equal(afterClose.has("engine"), true);
   assert.equal(hashDirFromOpen(afterClose, "hodovaya"), "engine");
   assert.equal(hashDirFromOpen(new Set(), "hodovaya"), null);
+});
+
+import { directionTitle } from "../js/summary.js";
+
+test("three named directions stay independent with full electric title", () => {
+  const bySlug = Object.fromEntries(DIRECTIONS.map((direction) => [direction.slug, direction]));
+  assert.equal(DIRECTIONS.length, 7);
+  assert.equal(new Set(DIRECTIONS.map((direction) => direction.slug)).size, 7);
+  assert.equal(bySlug.hodovaya.name, "Ходовая часть");
+  assert.equal(bySlug.hodovaya.checkpoints.length, 21);
+  assert.equal(bySlug.engine.name, "Двигатель");
+  assert.equal(bySlug.engine.checkpoints.length, 14);
+  assert.equal(bySlug.electric.slug, "electric");
+  assert.equal(bySlug.electric.name, "Электроприборы и электрооборудование");
+  assert.equal(bySlug.electric.checkpoints.length, 14);
+  assert.equal(directionTitle("electric", "Электрика"), "Электроприборы и электрооборудование");
+  assert.equal(directionTitle("hodovaya"), "Ходовая часть");
+  assert.equal(directionTitle("engine"), "Двигатель");
+  assert.ok(DIRECTION_IMAGES.hodovaya);
+  assert.ok(DIRECTION_IMAGES.engine);
+  assert.ok(DIRECTION_IMAGES.electric);
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(app, /Список проверок — \$\{direction\.checkpoints\.length\} узлов/);
+  assert.equal(app.includes("Узлы направления"), false);
+  assert.equal(app.includes("Электрика"), false);
+  assert.match(app, /Разделы диагностики/);
+  assert.match(app, /function directionNavHTML/);
+  const state = createDefaultState();
+  assert.equal(Object.keys(state.cars["primer-sedan"].results.hodovaya).length, 21);
+  assert.equal(Object.keys(state.cars["primer-sedan"].results.engine).length, 14);
+  assert.equal(Object.keys(state.cars["primer-sedan"].results.electric).length, 14);
+  assert.equal(state.cars["primer-sedan"].assignments.hodovaya.masterId, "master-1");
+  assert.equal(state.cars["primer-sedan"].assignments.engine.masterId, "master-2");
+  assert.equal(state.cars["primer-sedan"].assignments.electric.masterId, "master-2");
 });

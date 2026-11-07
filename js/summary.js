@@ -14,7 +14,7 @@ export const CONDITION_LABELS = {
 export const DIRECTION_TITLES = {
   hodovaya: "Ходовая часть",
   engine: "Двигатель",
-  electric: "Электрика",
+  electric: "Электроприборы и электрооборудование",
   body: "Кузов",
   interior: "Салон",
   geometry: "Геометрия и лонжероны",

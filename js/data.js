@@ -51,7 +51,7 @@ export const DIRECTIONS = [
     ],
   },
   {
-    name: "Электрика",
+    name: "Электроприборы и электрооборудование",
     slug: "electric",
     weight: 1,
     checkpoints: [
@@ -338,6 +338,13 @@ export function ensureCarShape(carState) {
       publicComment: current.publicComment || "",
       internalComment: current.internalComment || "",
     };
+  }
+  const named = carState.publishedSnapshot?.scores?.directionScores;
+  if (Array.isArray(named)) {
+    for (const item of named) {
+      const catalog = DIRECTIONS.find((direction) => direction.slug === item.id);
+      if (catalog) item.name = catalog.name;
+    }
   }
   return carState;
 }
