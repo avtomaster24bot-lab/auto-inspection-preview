@@ -286,6 +286,8 @@ export const SAMPLE_CARS = [
     vin: "НЕ VIN — демо-образец A",
     trim: "учебная комплектация",
     summary: "Вымышленный седан для показа карточки, отчёта и кнопки WhatsApp.",
+    image: "images/car-sedan.webp",
+    imageAlt: "Учебная иллюстрация седана, не фото реального осмотра",
   },
   {
     id: "primer-universal",
@@ -300,6 +302,8 @@ export const SAMPLE_CARS = [
     vin: "НЕ VIN — демо-образец B",
     trim: "учебная комплектация",
     summary: "Вымышленный универсал со статусом «в работе у мастеров».",
+    image: "images/car-wagon.webp",
+    imageAlt: "Учебная иллюстрация универсала, не фото реального осмотра",
   },
   {
     id: "primer-crossover",
@@ -314,6 +318,8 @@ export const SAMPLE_CARS = [
     vin: "НЕ VIN — демо-образец C",
     trim: "учебная комплектация",
     summary: "Вымышленный кроссовер без публикации — можно провести демо-процесс с нуля.",
+    image: "images/car-crossover.webp",
+    imageAlt: "Учебная иллюстрация кроссовера, не фото реального осмотра",
   },
 ];
 

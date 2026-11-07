@@ -159,9 +159,10 @@ test("each diagnostic direction has its own pictogram", () => {
 
 test("illustrations are large and distinct", () => {
   const drawn = DIRECTION_ICON_SLUGS.map((slug) => directionIcon(slug));
-  for (const svg of drawn) {
-    assert.match(svg, /viewBox="0 0 200 140"/);
-    assert.match(svg, /data-illustration="/);
+  for (const markup of drawn) {
+    assert.match(markup, /class="dir-photo"/);
+    assert.match(markup, /data-illustration="/);
+    assert.match(markup, /images\/dir-[a-z]+\.webp/);
   }
   assert.equal(new Set(drawn).size, 7);
 });
@@ -189,7 +190,7 @@ test("catalog home markup does not embed seven direction tiles", () => {
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
   const card = app.slice(app.indexOf("function carCard"), app.indexOf("function renderHome"));
   const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function renderCar"));
-  assert.match(card, /Открыть папку/);
+  assert.match(card, /Открыть оценочный лист/);
   assert.match(card, /overallHero/);
   assert.equal(card.includes("conditionGrid"), false);
   assert.equal(card.includes("directionPicker"), false);
@@ -197,10 +198,11 @@ test("catalog home markup does not embed seven direction tiles", () => {
   assert.equal(home.includes("directionPicker"), false);
   assert.match(app, /function renderCar/);
   assert.match(app, /Оценочный лист/);
-  assert.match(app, />Фото </);
-  assert.match(app, />Видео </);
-  assert.match(app, /Пока нет фотографий в этой папке/);
-  assert.match(app, /Пока нет видео в этой папке/);
+  assert.match(app, /Фото \(/);
+  assert.match(app, /Видео \(/);
+  assert.match(app, /Добавьте фото состояния узла/);
+  assert.match(app, /Материалы пока не добавлены/);
+  assert.match(app, /Что важно знать/);
 });
 
 test("media validation rejects wrong type, size and folder counts", () => {
@@ -242,4 +244,40 @@ test("ensureCarShape adds direction notes without wiping scores", () => {
   assert.equal(next.directionNotes.engine.internalComment, "");
   assert.equal(next.results.hodovaya["amort-rear"].publicComment, originalComment);
   assert.notEqual(originalComment, "");
+});
+
+import { existsSync } from "node:fs";
+import { DIRECTION_IMAGES } from "../js/icons.js";
+import { parseRoute, canonicalHash, isCarRoute } from "../js/routes.js";
+
+test("report and inspect hashes stay compatible with the car dossier", () => {
+  const report = parseRoute("#/report/primer-sedan/hodovaya");
+  assert.equal(report.name, "report");
+  assert.equal(report.id, "primer-sedan");
+  assert.equal(report.dir, "hodovaya");
+  assert.equal(isCarRoute(report), true);
+  assert.equal(canonicalHash(report), "#/c/primer-sedan/hodovaya");
+  const inspect = parseRoute("#/inspect/primer-universal/engine");
+  assert.equal(canonicalHash(inspect), "#/c/primer-universal/engine");
+  const car = parseRoute("#/c/primer-sedan");
+  assert.equal(car.name, "car");
+  assert.equal(canonicalHash(car), "#/c/primer-sedan");
+  assert.equal(parseRoute("#/admin").name, "admin");
+});
+
+test("category image files exist and stay isolated by slug", () => {
+  const srcs = DIRECTION_ICON_SLUGS.map((slug) => DIRECTION_IMAGES[slug].src);
+  assert.equal(new Set(srcs).size, 7);
+  for (const slug of DIRECTION_ICON_SLUGS) {
+    const item = DIRECTION_IMAGES[slug];
+    assert.equal(existsSync(new URL(`../${item.src}`, import.meta.url)), true);
+    assert.match(item.alt, /[А-Яа-яA-Za-z]/);
+  }
+  assert.match(DIRECTION_IMAGES.hodovaya.alt, /пружин/i);
+  assert.match(DIRECTION_IMAGES.engine.alt, /двигател/i);
+  assert.match(DIRECTION_IMAGES.electric.alt, /аккумулятор/i);
+  assert.match(DIRECTION_IMAGES.body.alt, /кузов/i);
+  assert.match(DIRECTION_IMAGES.interior.alt, /сиден/i);
+  assert.match(DIRECTION_IMAGES.geometry.alt, /лонжерон/i);
+  assert.match(DIRECTION_IMAGES.wheels.alt, /колес/i);
 });

@@ -4,11 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>АвтоМастер24 / Трейд-ин — демонстрация осмотра</title>
-  <meta name="description" content="Статическое учебное демо независимого осмотра автомобиля. Данные только в браузере, без авторизации и сервера.">
+  <meta name="description" content="Учебный предпросмотр независимого осмотра автомобиля. Данные только на этом устройстве.">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <div class="badge">Демонстрация. Данные сохраняются только в этом браузере — не вводите реальные данные клиентов</div>
+  <div class="badge">
+    <span>Демо · данные только на этом устройстве</span>
+    <details class="badge-more">
+      <summary>Подробнее</summary>
+      <p>Учебный предпросмотр оценочного листа. Тексты сохраняются в этом браузере, фото и видео — тоже только здесь. Не вводите реальные данные клиентов. Выбор роли не является входом в систему.</p>
+    </details>
+  </div>
   <div id="app"></div>
   <script type="module" src="js/app.js"></script>
 </body>
