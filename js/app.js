@@ -4,6 +4,7 @@ import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js";
 import { loadState, saveState, clearState } from "./storage.js";
 import { summarizeDirection, summarizeOverall, directionTitle } from "./summary.js";
 import { directionIcon } from "./icons.js";
+import { folderKey, nodeFolderKey } from "./folder.js";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -14,6 +15,7 @@ const STATUS_LABEL = {
 
 const openDirs = new Set();
 const openNodes = new Set();
+const localFolderFiles = new Map();
 let printOpened = [];
 
 let state = hydrate();
@@ -243,9 +245,8 @@ function directionHref(carId, slug, unpublished) {
 }
 
 function moreLabel(href, unpublished) {
-  if (href) return "Посмотреть детали";
-  if (unpublished) return "Отчёт ещё не опубликован";
-  return "Посмотреть детали";
+  if (unpublished && !href) return "Отчёт ещё не опубликован";
+  return "Открыть папку направления";
 }
 
 function dirCardTile(carId, direction, scores, unpublished) {
@@ -265,13 +266,13 @@ function conditionGrid(carId) {
   const dirs = visibleDirections(carState);
   if (!dirs.length) {
     return `<section class="condition">
-      <h2>Состояние автомобиля</h2>
+      <h2>Папки диагностики</h2>
       <p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>
     </section>`;
   }
   return `<section class="condition">
-    <h2>Состояние автомобиля</h2>
-    <p class="lead">Картинка направления и его оценка. Нажмите карточку, чтобы открыть подробный список узлов.</p>
+    <h2>Папки диагностики</h2>
+    <p class="lead">У каждого направления своя папка с картинкой, оценкой и подробным списком узлов этого автомобиля.</p>
     ${conditionLegend()}
     <div class="dir-grid">${dirs.map((direction) => dirCardTile(carId, direction, scores, unpublished)).join("")}</div>
   </section>`;
@@ -306,14 +307,15 @@ function carCard(car) {
   const carState = state.cars[car.id];
   return `<article class="card">
     ${carSvg()}
-    <p class="tag">${car.label}</p>
+    <p class="tag">Папка автомобиля · ${car.label}</p>
     <h2>${car.make} ${car.model}</h2>
     <p class="meta">${car.year} · ${car.mileage.toLocaleString("ru-RU")} км · ${car.color}</p>
     <p class="status">${STATUS_LABEL[carState.status]}</p>
     ${overallHero(car.id)}
     <p>${car.summary}</p>
+    <p class="hint">Папка автомобиля: сведения, акт оценки и папки диагностики только этого авто. Это папка внутри сайта, не на диске компьютера.</p>
     <div class="row">
-      <a class="btn" href="#/c/${car.id}">Карточка</a>
+      <a class="btn" href="#/c/${car.id}">Открыть папку</a>
     </div>
     ${actionRow(car)}
     ${conditionGrid(car.id)}
@@ -325,7 +327,7 @@ function renderHome() {
   return `${header()}
     <main class="wrap">
       <h1>Каталог учебных автомобилей</h1>
-      <p class="lead">Три вымышленных образца. На каждой карточке — семь направлений диагностики: картинка, оценка и кнопка «Посмотреть детали».</p>
+      <p class="lead">Каждый автомобиль лежит в своей папке: сведения об авто, акт оценки и отдельные папки направлений. Нажмите «Открыть папку». Данные разных машин не смешиваются.</p>
       ${fillHint()}
       <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
     </main>`;
@@ -337,9 +339,10 @@ function renderCar(id) {
   if (!car || !carState) return `${header()}<main class="wrap"><h1>Образец не найден</h1></main>`;
   return `${header()}
     <main class="wrap">
-      <a class="back" href="#/">← К списку</a>
-      <p class="tag">${car.label}</p>
-      <h1>${car.make} ${car.model}, ${car.year}</h1>
+      <a class="back" href="#/">Все автомобили</a>
+      <p class="tag">Папка автомобиля · ${car.label}</p>
+      <h1>Папка автомобиля: ${car.make} ${car.model}, ${car.year}</h1>
+      <p class="lead">Здесь только этот автомобиль — сведения, акт осмотра и папки диагностики. Описания и файлы другого авто сюда не попадают. Это папка внутри сайта, не на диске компьютера.</p>
       ${carSvg()}
       <dl class="facts">
         <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
@@ -360,8 +363,8 @@ function nodeScoreLabel(score) {
   return score == null ? "не проверено" : `${score}/10`;
 }
 
-function inspectNode(direction, checkpoint, result) {
-  const key = `${direction.slug}:${checkpoint.slug}`;
+function inspectNode(carId, direction, checkpoint, result) {
+  const key = nodeFolderKey(carId, direction.slug, checkpoint.slug);
   const scoreOptions = [`<option value="" ${result.score == null ? "selected" : ""}>не проверено</option>`]
     .concat(Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${result.score === n ? "selected" : ""}>${n}</option>`))
     .join("");
@@ -391,8 +394,8 @@ function inspectNode(direction, checkpoint, result) {
   </details>`;
 }
 
-function readOnlyNode(direction, checkpoint, result) {
-  const key = `ro:${direction.slug}:${checkpoint.slug}`;
+function readOnlyNode(carId, direction, checkpoint, result) {
+  const key = `ro:${nodeFolderKey(carId, direction.slug, checkpoint.slug)}`;
   const internal =
     canSeeInternal() && result.internalComment
       ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(result.internalComment)}</div>`
@@ -412,8 +415,24 @@ function readOnlyNode(direction, checkpoint, result) {
 
 function pickerCard(direction, summary, selected) {
   return `<button type="button" class="dir-card ${severityClass(summary)}${selected ? " is-selected" : ""}" data-select-dir="${direction.slug}" aria-expanded="${selected ? "true" : "false"}" aria-controls="dirExpand">
-    ${cardFace(direction, summary, selected ? "Скрыть детали" : "Посмотреть детали")}
+    ${cardFace(direction, summary, selected ? "Скрыть папку направления" : "Открыть папку направления")}
   </button>`;
+}
+
+function folderFilesHTML(carId, slug) {
+  const key = folderKey(carId, slug);
+  const stored = localFolderFiles.get(key);
+  const car = carMeta(carId);
+  const title = directionTitle(slug);
+  const preview = stored
+    ? `<img alt="Локальный предпросмотр файла этой папки" src="${stored.url}"><p class="hint">«${escapeHtml(stored.name)}» относится только к «${escapeHtml(car ? `${car.make} ${car.model}` : carId)}» / «${escapeHtml(title)}». Файл не отправлен на сервер.</p>`
+    : "";
+  return `<section class="folder-files card">
+    <h3>Файлы папки «${escapeHtml(title)}»</h3>
+    <p class="hint">Просмотр только в этом браузере и только в папке этого автомобиля и этого направления. Файл не загружается на сервер и не появится у другой машины. Это папка внутри сайта, не на диске компьютера. Отдельного видеоотчёта в демо нет.</p>
+    <input type="file" data-folder-file="${escapeHtml(key)}" accept="image/*">
+    <div data-folder-preview="${escapeHtml(key)}" class="local-preview" ${stored ? "" : "hidden"}>${preview}</div>
+  </section>`;
 }
 
 function inspectPanelHTML(carId, slug) {
@@ -422,12 +441,14 @@ function inspectPanelHTML(carId, slug) {
   if (!direction || !carState) return `<p>Направление не найдено</p>`;
   const assignment = carState.assignments[slug];
   const nodes = direction.checkpoints
-    .map((checkpoint) => inspectNode(direction, checkpoint, carState.results[slug][checkpoint.slug]))
+    .map((checkpoint) => inspectNode(carId, direction, checkpoint, carState.results[slug][checkpoint.slug]))
     .join("");
-  return `<h3>${directionTitle(slug, direction.name)}</h3>
-    <p class="hint">Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment?.masterId)?.name || "не назначен"} · статус ${assignment?.status || "pending"}</p>
+  const car = carMeta(carId);
+  return `<h3>Папка направления: ${directionTitle(slug, direction.name)}</h3>
+    <p class="hint">Эта папка принадлежит автомобилю «${car ? `${car.make} ${car.model}` : carId}» и не смешивается с другими машинами. Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment?.masterId)?.name || "не назначен"} · статус ${assignment?.status || "pending"}</p>
     ${nodes}
-    ${state.role === "master" ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}`;
+    ${state.role === "master" ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}
+    ${folderFilesHTML(carId, slug)}`;
 }
 
 function reportPanelHTML(carId, slug) {
@@ -435,10 +456,11 @@ function reportPanelHTML(carId, slug) {
   const direction = DIRECTIONS.find((item) => item.slug === slug);
   if (!direction || !carState) return `<p>Направление не найдено</p>`;
   const nodes = direction.checkpoints
-    .map((checkpoint) => readOnlyNode(direction, checkpoint, carState.results[slug][checkpoint.slug]))
+    .map((checkpoint) => readOnlyNode(carId, direction, checkpoint, carState.results[slug][checkpoint.slug]))
     .join("");
-  return `<h3>${directionTitle(slug, direction.name)}</h3>
-    <p class="hint">Подробные оценки узлов этого направления.</p>
+  const car = carMeta(carId);
+  return `<h3>Папка направления: ${directionTitle(slug, direction.name)}</h3>
+    <p class="hint">Оценки узлов только автомобиля «${car ? `${car.make} ${car.model}` : carId}». Описания другого авто здесь не показываются.</p>
     ${nodes}`;
 }
 
@@ -494,8 +516,8 @@ function renderInspect(id, route) {
   if (!canEdit()) {
     return `${header()}
       <main class="wrap">
-        <a class="back" href="#/c/${car.id}">← К карточке</a>
-        <h1>Заполнение чек-листа</h1>
+        <a class="back" href="#/c/${car.id}">К папке автомобиля</a>
+        <h1>Папка автомобиля: ${car.make} ${car.model}</h1>
         ${fillHint()}
         ${conditionGrid(id)}
         ${state.role !== "buyer" || carState.status === "published" ? `<p><a class="btn" href="#/report/${car.id}">Открыть отчёт с подробностями</a></p>` : ""}
@@ -507,19 +529,15 @@ function renderInspect(id, route) {
   if (selected) openDirs.add(selected);
   return `${header()}
     <main class="wrap">
-      <a class="back" href="#/c/${car.id}">← К карточке</a>
-      <h1>Чек-лист: ${car.make} ${car.model}</h1>
+      <a class="back" href="#/c/${car.id}">К папке автомобиля</a>
+      <p class="tag">Папка автомобиля · ${car.label}</p>
+      <h1>Чек-лист: ${car.make} ${car.model}, ${car.year}</h1>
       ${fillHint()}
       <p class="lead" id="inspectProgress">${progressLine(scores, dirs)}</p>
       <p class="hint">Автосохранение только в этом браузере. Нажмите картинку направления, затем нужный узел.</p>
       ${conditionLegend()}
       ${directionPicker(id, dirs, scores, false, selected, "inspect")}
-      <section class="card">
-        <h2>Локальный просмотр файла</h2>
-        <p class="hint">Файл остаётся только в этом окне браузера и никуда не загружается. После обновления страницы превью исчезнет. Общего видеоотчёта в этом демо нет.</p>
-        <input type="file" id="localFile" accept="image/*">
-        <div id="localPreview" class="local-preview" hidden></div>
-      </section>
+      <p class="hint">Файлы добавляются внутри выбранной папки направления и привязаны только к этому автомобилю.</p>
     </main>`;
 }
 
@@ -541,8 +559,8 @@ function renderReport(id, route) {
   if (selected) openDirs.add(selected);
   return `${header()}
     <main class="wrap report">
-      <a class="back no-print" href="#/c/${car.id}">← К карточке</a>
-      <p class="tag">Учебный аукционный лист</p>
+      <a class="back no-print" href="#/c/${car.id}">К папке автомобиля</a>
+      <p class="tag">Папка автомобиля · ${car.label} · учебный аукционный лист</p>
       <h1>Акт осмотра: ${car.make} ${car.model}, ${car.year}</h1>
       <p class="watermark">ДЕМОНСТРАЦИЯ · НЕ РЕАЛЬНЫЙ ОСМОТР</p>
       <div class="media-ph">${carSvg()}<span>Схема-заполнитель, не фото реального осмотра</span></div>
@@ -556,8 +574,8 @@ function renderReport(id, route) {
       ${critical ? `<section><h2>Критичные замечания</h2><ul>${critical}</ul></section>` : ""}
       <section><h2>Итоговое заключение</h2><p>${escapeHtml(conclusion || "Заключение ещё не заполнено в этой демонстрации.")}</p></section>
       <section class="condition">
-        <h2>Состояние автомобиля</h2>
-        <p class="lead">Семь направлений. Нажмите карточку, чтобы раскрыть оценки узлов.</p>
+        <h2>Папки диагностики</h2>
+        <p class="lead">Семь папок направлений этого автомобиля. Нажмите, чтобы открыть оценки узлов только этой машины.</p>
         ${conditionLegend()}
         ${directionPicker(id, dirs, scores, unpublished, selected, "report")}
         ${printAllHTML(id, dirs)}
@@ -681,7 +699,7 @@ function applySelectedDirection(slug, { updateHash = true } = {}) {
     el.classList.toggle("is-selected", on);
     el.setAttribute("aria-expanded", on ? "true" : "false");
     const more = el.querySelector(".more");
-    if (more) more.textContent = on ? "Скрыть детали" : "Посмотреть детали";
+    if (more) more.textContent = on ? "Скрыть папку направления" : "Открыть папку направления";
   });
   const panel = document.getElementById("dirExpand");
   if (panel) {
@@ -694,6 +712,7 @@ function applySelectedDirection(slug, { updateHash = true } = {}) {
       panel.innerHTML = mode === "inspect" && canEdit() ? inspectPanelHTML(carId, slug) : reportPanelHTML(carId, slug);
       bindFieldRoot(panel);
       bindDisclosure(panel);
+      bindFolderFiles(panel);
     }
   }
   if (updateHash && (route.name === "report" || route.name === "inspect") && carId) {
@@ -708,6 +727,35 @@ function bindPicker() {
       const slug = button.getAttribute("data-select-dir");
       const route = parseRoute();
       applySelectedDirection(route.dir === slug ? null : slug);
+    });
+  });
+}
+
+function bindFolderFiles(root = document) {
+  root.querySelectorAll("[data-folder-file]").forEach((input) => {
+    input.addEventListener("change", (event) => {
+      const key = input.getAttribute("data-folder-file");
+      const file = event.target.files && event.target.files[0];
+      const box = root.querySelector(`[data-folder-preview="${key}"]`) || document.querySelector(`[data-folder-preview="${key}"]`);
+      const previous = localFolderFiles.get(key);
+      if (previous && previous.url) URL.revokeObjectURL(previous.url);
+      if (!file) {
+        localFolderFiles.delete(key);
+        if (box) {
+          box.hidden = true;
+          box.innerHTML = "";
+        }
+        return;
+      }
+      const [carId, directionId] = key.split("/");
+      const stored = { key, carId, directionId, name: file.name, url: URL.createObjectURL(file) };
+      localFolderFiles.set(key, stored);
+      if (box) {
+        const car = carMeta(carId);
+        const title = directionTitle(directionId);
+        box.hidden = false;
+        box.innerHTML = `<img alt="Локальный предпросмотр файла этой папки" src="${stored.url}"><p class="hint">«${escapeHtml(file.name)}» относится только к «${escapeHtml(car ? `${car.make} ${car.model}` : carId)}» / «${escapeHtml(title)}». Файл не отправлен на сервер.</p>`;
+      }
     });
   });
 }
@@ -765,25 +813,17 @@ function bind() {
   document.getElementById("resetDemo")?.addEventListener("click", () => {
     if (confirm("Сбросить учебные данные в этом браузере до исходных образцов?")) {
       clearState();
+      localFolderFiles.forEach((item) => {
+        if (item.url) URL.revokeObjectURL(item.url);
+      });
+      localFolderFiles.clear();
       state = createDefaultState();
       persist();
       render();
     }
   });
   document.getElementById("printReport")?.addEventListener("click", () => window.print());
-  document.getElementById("localFile")?.addEventListener("change", (event) => {
-    const file = event.target.files && event.target.files[0];
-    const box = document.getElementById("localPreview");
-    if (!box) return;
-    box.innerHTML = "";
-    if (!file) {
-      box.hidden = true;
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    box.hidden = false;
-    box.innerHTML = `<img alt="Локальный предпросмотр выбранного файла" src="${url}"><p class="hint">«${escapeHtml(file.name)}» не отправлен на сервер.</p>`;
-  });
+  bindFolderFiles(document);
   document.querySelectorAll("[data-assign]").forEach((select) => {
     select.addEventListener("change", () => {
       const carId = select.getAttribute("data-assign");

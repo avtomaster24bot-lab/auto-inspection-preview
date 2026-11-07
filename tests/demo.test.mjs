@@ -115,6 +115,7 @@ test("local demo state round-trip", () => {
 
 import { conditionFromScore, summarizeDirection, summarizeOverall, CONDITION_LABELS } from "../js/summary.js";
 import { DIRECTION_ICON_SLUGS, directionIcon } from "../js/icons.js";
+import { folderKey, nodeFolderKey, parseFolderKey } from "../js/folder.js";
 
 test("unchecked and missing scores never look like zero", () => {
   assert.equal(conditionFromScore(null).label, CONDITION_LABELS.unchecked);
@@ -163,4 +164,18 @@ test("illustrations are large and distinct", () => {
     assert.match(svg, /data-illustration="/);
   }
   assert.equal(new Set(drawn).size, 7);
+});
+
+test("folder keys keep cars and directions apart", () => {
+  assert.equal(folderKey("primer-sedan", "hodovaya"), "primer-sedan/hodovaya");
+  assert.notEqual(folderKey("primer-sedan", "hodovaya"), folderKey("primer-universal", "hodovaya"));
+  assert.notEqual(folderKey("primer-sedan", "hodovaya"), folderKey("primer-sedan", "engine"));
+  assert.equal(nodeFolderKey("primer-sedan", "hodovaya", "amort-front"), "primer-sedan/hodovaya/amort-front");
+  assert.deepEqual(parseFolderKey("primer-sedan/hodovaya/amort-front"), {
+    carId: "primer-sedan",
+    directionId: "hodovaya",
+    checkpointId: "amort-front",
+  });
+  assert.throws(() => folderKey("", "hodovaya"));
+  assert.throws(() => folderKey("primer-sedan", ""));
 });
