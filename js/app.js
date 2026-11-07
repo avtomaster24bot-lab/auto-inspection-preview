@@ -186,9 +186,22 @@ function condMark(kind) {
 
 function summaryFields(summary) {
   return `<p class="dir-score">${escapeHtml(summary.scoreText)}</p>
-    <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span>${escapeHtml(summary.label)}</p>
+    <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span><span>${escapeHtml(summary.label)}</span></p>
     <p class="dir-cov">${escapeHtml(summary.coverageText)} проверено</p>
-    ${summary.hasCritical ? `<p class="dir-crit"><span aria-hidden="true">!</span> Есть критичные замечания</p>` : ""}`;
+    ${summary.hasCritical ? `<p class="dir-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Есть критичные замечания</span></p>` : ""}`;
+}
+
+function severityClass(summary) {
+  return `kind-${summary.kind}${summary.hasCritical ? " has-critical" : ""}`;
+}
+
+function cardFace(direction, summary, more) {
+  return `<span class="dir-illust">${directionIcon(direction.slug)}</span>
+    <div class="dir-copy">
+      <h3>${directionTitle(direction.slug, direction.name)}</h3>
+      <div data-summary-body="${direction.slug}">${summaryFields(summary)}</div>
+      <span class="more">${more}</span>
+    </div>`;
 }
 
 function header() {
@@ -239,17 +252,11 @@ function dirCardTile(carId, direction, scores, unpublished) {
   const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
   const summary = summarizeDirection(dirScore, { unpublished });
   const href = directionHref(carId, direction.slug, unpublished);
-  const title = directionTitle(direction.slug, direction.name);
-  const inner = `${directionIcon(direction.slug)}
-    <div class="dir-copy">
-      <h3>${title}</h3>
-      <div data-summary-body="${direction.slug}">${summaryFields(summary)}</div>
-      <span class="more">${moreLabel(href, unpublished)}</span>
-    </div>`;
+  const inner = cardFace(direction, summary, moreLabel(href, unpublished));
   if (href) {
-    return `<a class="dir-card kind-${summary.kind}" href="${href}">${inner}</a>`;
+    return `<a class="dir-card ${severityClass(summary)}" href="${href}">${inner}</a>`;
   }
-  return `<div class="dir-card kind-${summary.kind} is-static">${inner}</div>`;
+  return `<div class="dir-card ${severityClass(summary)} is-static">${inner}</div>`;
 }
 
 function conditionGrid(carId) {
@@ -273,12 +280,12 @@ function conditionGrid(carId) {
 function overallHero(carId) {
   const { scores, unpublished } = overviewFor(carId);
   const summary = summarizeOverall(scores, { unpublished });
-  return `<div class="score-hero kind-${summary.kind}">
+  return `<div class="score-hero ${severityClass(summary)}">
     <strong>${escapeHtml(summary.scoreText)}</strong>
     <div>
-      <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span>${escapeHtml(summary.label)}</p>
+      <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span><span>${escapeHtml(summary.label)}</span></p>
       <p>Покрытие ${escapeHtml(summary.coverageText)}</p>
-      ${summary.hasCritical ? `<p class="dir-crit">Есть критичные замечания</p>` : ""}
+      ${summary.hasCritical ? `<p class="dir-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Есть критичные замечания</span></p>` : ""}
     </div>
   </div>`;
 }
@@ -403,21 +410,74 @@ function readOnlyNode(direction, checkpoint, result) {
   </details>`;
 }
 
-function dirAccordion(direction, summary, inner, route) {
-  const slug = direction.slug;
-  if (route.dir === slug) openDirs.add(slug);
-  const open = openDirs.has(slug) ? " open" : "";
-  return `<details class="dir-details kind-${summary.kind}" data-dir="${slug}"${open}>
-    <summary>
-      ${directionIcon(slug)}
-      <div class="dir-copy">
-        <h3>${directionTitle(slug, direction.name)}</h3>
-        <div data-summary-body="${slug}">${summaryFields(summary)}</div>
-        <span class="more">Посмотреть детали</span>
-      </div>
-    </summary>
-    <div class="dir-panel">${inner}</div>
-  </details>`;
+function pickerCard(direction, summary, selected) {
+  return `<button type="button" class="dir-card ${severityClass(summary)}${selected ? " is-selected" : ""}" data-select-dir="${direction.slug}" aria-expanded="${selected ? "true" : "false"}" aria-controls="dirExpand">
+    ${cardFace(direction, summary, selected ? "Скрыть детали" : "Посмотреть детали")}
+  </button>`;
+}
+
+function inspectPanelHTML(carId, slug) {
+  const carState = state.cars[carId];
+  const direction = DIRECTIONS.find((item) => item.slug === slug);
+  if (!direction || !carState) return `<p>Направление не найдено</p>`;
+  const assignment = carState.assignments[slug];
+  const nodes = direction.checkpoints
+    .map((checkpoint) => inspectNode(direction, checkpoint, carState.results[slug][checkpoint.slug]))
+    .join("");
+  return `<h3>${directionTitle(slug, direction.name)}</h3>
+    <p class="hint">Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment?.masterId)?.name || "не назначен"} · статус ${assignment?.status || "pending"}</p>
+    ${nodes}
+    ${state.role === "master" ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}`;
+}
+
+function reportPanelHTML(carId, slug) {
+  const carState = state.cars[carId];
+  const direction = DIRECTIONS.find((item) => item.slug === slug);
+  if (!direction || !carState) return `<p>Направление не найдено</p>`;
+  const nodes = direction.checkpoints
+    .map((checkpoint) => readOnlyNode(direction, checkpoint, carState.results[slug][checkpoint.slug]))
+    .join("");
+  return `<h3>${directionTitle(slug, direction.name)}</h3>
+    <p class="hint">Подробные оценки узлов этого направления.</p>
+    ${nodes}`;
+}
+
+function printAllHTML(carId, dirs) {
+  const carState = state.cars[carId];
+  return `<div class="print-all">${dirs
+    .map((direction) => {
+      const items = direction.checkpoints
+        .map((checkpoint) => {
+          const result = carState.results[direction.slug][checkpoint.slug];
+          const internal =
+            canSeeInternal() && result.internalComment
+              ? ` Внутреннее: ${escapeHtml(result.internalComment)}`
+              : "";
+          return `<li>${checkpoint.name} — ${nodeScoreLabel(result.score)} — ${escapeHtml(result.versionNote || "—")}. ${escapeHtml(result.publicComment || "—")}${internal}</li>`;
+        })
+        .join("");
+      return `<section><h3>${directionTitle(direction.slug, direction.name)}</h3><ul>${items}</ul></section>`;
+    })
+    .join("")}</div>`;
+}
+
+function directionPicker(carId, dirs, scores, unpublished, selected, mode) {
+  if (!dirs.length) return `<p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>`;
+  const tiles = dirs
+    .map((direction) => {
+      const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
+      const summary = summarizeDirection(dirScore, { unpublished });
+      return pickerCard(direction, summary, selected === direction.slug);
+    })
+    .join("");
+  const panel =
+    selected && mode === "inspect"
+      ? inspectPanelHTML(carId, selected)
+      : selected
+        ? reportPanelHTML(carId, selected)
+        : "";
+  return `<div class="dir-grid">${tiles}</div>
+    <div id="dirExpand" class="dir-expand" data-panel-mode="${mode}" ${selected ? "" : "hidden"}>${panel || ""}</div>`;
 }
 
 function progressLine(scores, dirs) {
@@ -443,27 +503,17 @@ function renderInspect(id, route) {
   }
   const dirs = visibleDirections(carState);
   const scores = liveScoresForCar(carState);
-  const blocks = dirs.map((direction) => {
-    const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
-    const summary = summarizeDirection(dirScore);
-    const assignment = carState.assignments[direction.slug];
-    const nodes = direction.checkpoints
-      .map((checkpoint) => inspectNode(direction, checkpoint, carState.results[direction.slug][checkpoint.slug]))
-      .join("");
-    const inner = `<p class="hint">Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment?.masterId)?.name || "не назначен"} · статус ${assignment?.status || "pending"}</p>
-      ${nodes}
-      ${state.role === "master" ? `<button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button>` : ""}`;
-    return dirAccordion(direction, summary, inner, route);
-  });
+  const selected = route.dir && dirs.some((item) => item.slug === route.dir) ? route.dir : null;
+  if (selected) openDirs.add(selected);
   return `${header()}
     <main class="wrap">
       <a class="back" href="#/c/${car.id}">← К карточке</a>
       <h1>Чек-лист: ${car.make} ${car.model}</h1>
       ${fillHint()}
       <p class="lead" id="inspectProgress">${progressLine(scores, dirs)}</p>
-      <p class="hint">Автосохранение только в этом браузере. Откройте направление, затем нужный узел.</p>
+      <p class="hint">Автосохранение только в этом браузере. Нажмите картинку направления, затем нужный узел.</p>
       ${conditionLegend()}
-      ${state.role === "master" && dirs.length === 0 ? `<p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>` : `<div class="dir-stack">${blocks.join("")}</div>`}
+      ${directionPicker(id, dirs, scores, false, selected, "inspect")}
       <section class="card">
         <h2>Локальный просмотр файла</h2>
         <p class="hint">Файл остаётся только в этом окне браузера и никуда не загружается. После обновления страницы превью исчезнет. Общего видеоотчёта в этом демо нет.</p>
@@ -487,16 +537,8 @@ function renderReport(id, route) {
       : carState.conclusion || carState.publishedSnapshot?.conclusion || "";
   const critical = (scores.criticalFaults || []).map((item) => `<li>${item.name}: ${item.score}</li>`).join("");
   const dirs = visibleDirections(carState);
-  const blocks = dirs
-    .map((direction) => {
-      const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
-      const summary = summarizeDirection(dirScore, { unpublished });
-      const nodes = direction.checkpoints
-        .map((checkpoint) => readOnlyNode(direction, checkpoint, carState.results[direction.slug][checkpoint.slug]))
-        .join("");
-      return dirAccordion(direction, summary, nodes, route);
-    })
-    .join("");
+  const selected = route.dir && dirs.some((item) => item.slug === route.dir) ? route.dir : null;
+  if (selected) openDirs.add(selected);
   return `${header()}
     <main class="wrap report">
       <a class="back no-print" href="#/c/${car.id}">← К карточке</a>
@@ -517,7 +559,8 @@ function renderReport(id, route) {
         <h2>Состояние автомобиля</h2>
         <p class="lead">Семь направлений. Нажмите карточку, чтобы раскрыть оценки узлов.</p>
         ${conditionLegend()}
-        <div class="dir-stack">${blocks}</div>
+        ${directionPicker(id, dirs, scores, unpublished, selected, "report")}
+        ${printAllHTML(id, dirs)}
       </section>
       <div class="no-print">
         ${fillHint()}
@@ -606,23 +649,20 @@ function patchLiveSummaries(carId) {
     document.querySelectorAll(`[data-summary-body="${direction.slug}"]`).forEach((holder) => {
       holder.innerHTML = summaryFields(summary);
     });
-    document.querySelectorAll(`details[data-dir="${direction.slug}"]`).forEach((el) => {
-      el.className = `dir-details kind-${summary.kind}`;
+    document.querySelectorAll(`[data-select-dir="${direction.slug}"], a.dir-card`).forEach((el) => {
+      if (el.getAttribute("data-select-dir") !== direction.slug && !el.querySelector(`[data-summary-body="${direction.slug}"]`)) return;
+      if (!el.querySelector(`[data-summary-body="${direction.slug}"]`)) return;
+      const selected = el.classList.contains("is-selected");
+      el.className = `dir-card ${severityClass(summary)}${selected ? " is-selected" : ""}${el.tagName === "A" ? "" : ""}`;
+      if (el.classList.contains("is-static")) el.classList.add("is-static");
     });
   }
   const progress = document.getElementById("inspectProgress");
   if (progress) progress.textContent = progressLine(scores, dirs);
 }
 
-function bindDisclosure() {
-  document.querySelectorAll("details[data-dir]").forEach((el) => {
-    el.addEventListener("toggle", () => {
-      const slug = el.getAttribute("data-dir");
-      if (el.open) openDirs.add(slug);
-      else openDirs.delete(slug);
-    });
-  });
-  document.querySelectorAll("details[data-node]").forEach((el) => {
+function bindDisclosure(root = document) {
+  root.querySelectorAll("details[data-node]").forEach((el) => {
     el.addEventListener("toggle", () => {
       const key = el.getAttribute("data-node");
       if (el.open) openNodes.add(key);
@@ -631,8 +671,87 @@ function bindDisclosure() {
   });
 }
 
+function applySelectedDirection(slug, { updateHash = true } = {}) {
+  const route = parseRoute();
+  const carId = route.id;
+  openDirs.clear();
+  if (slug) openDirs.add(slug);
+  document.querySelectorAll("[data-select-dir]").forEach((el) => {
+    const on = el.getAttribute("data-select-dir") === slug;
+    el.classList.toggle("is-selected", on);
+    el.setAttribute("aria-expanded", on ? "true" : "false");
+    const more = el.querySelector(".more");
+    if (more) more.textContent = on ? "Скрыть детали" : "Посмотреть детали";
+  });
+  const panel = document.getElementById("dirExpand");
+  if (panel) {
+    if (!slug) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    } else {
+      const mode = panel.getAttribute("data-panel-mode") || route.name;
+      panel.hidden = false;
+      panel.innerHTML = mode === "inspect" && canEdit() ? inspectPanelHTML(carId, slug) : reportPanelHTML(carId, slug);
+      bindFieldRoot(panel);
+      bindDisclosure(panel);
+    }
+  }
+  if (updateHash && (route.name === "report" || route.name === "inspect") && carId) {
+    const next = slug ? `#/${route.name}/${carId}/${slug}` : `#/${route.name}/${carId}`;
+    if (location.hash !== next) history.replaceState(null, "", next);
+  }
+}
+
+function bindPicker() {
+  document.querySelectorAll("[data-select-dir]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const slug = button.getAttribute("data-select-dir");
+      const route = parseRoute();
+      applySelectedDirection(route.dir === slug ? null : slug);
+    });
+  });
+}
+
+function bindFieldRoot(root) {
+  root.querySelectorAll("[data-act]").forEach((el) => {
+    const apply = () => {
+      const dir = el.getAttribute("data-dir");
+      const cp = el.getAttribute("data-cp");
+      const act = el.getAttribute("data-act");
+      const carId = parseRoute().id;
+      const result = state.cars[carId].results[dir][cp];
+      if (act === "score") result.score = el.value === "" ? null : Number(el.value);
+      if (act === "version") result.versionNote = el.value;
+      if (act === "public") result.publicComment = el.value;
+      if (act === "internal") result.internalComment = el.value;
+      const carState = state.cars[carId];
+      if (carState.status === "created" || carState.status === "published") {
+        if (carState.status !== "published") carState.status = "in_progress";
+      }
+      const head = document.querySelector(`[data-node="${dir}:${cp}"] .node-score`);
+      if (head && act === "score") head.textContent = nodeScoreLabel(result.score);
+      scheduleSave();
+      patchLiveSummaries(carId);
+    };
+    el.addEventListener("change", apply);
+    el.addEventListener("input", apply);
+  });
+  root.querySelectorAll("[data-submit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const dir = button.getAttribute("data-submit");
+      const carState = state.cars[parseRoute().id];
+      carState.assignments[dir].status = "submitted";
+      carState.status = "in_review";
+      persist();
+      render();
+    });
+  });
+}
+
 function bind() {
   bindDisclosure();
+  bindPicker();
+  bindFieldRoot(document);
   document.getElementById("roleSelect")?.addEventListener("change", (event) => {
     state.role = event.target.value;
     persist();
@@ -664,39 +783,6 @@ function bind() {
     const url = URL.createObjectURL(file);
     box.hidden = false;
     box.innerHTML = `<img alt="Локальный предпросмотр выбранного файла" src="${url}"><p class="hint">«${escapeHtml(file.name)}» не отправлен на сервер.</p>`;
-  });
-  document.querySelectorAll("[data-act]").forEach((el) => {
-    const apply = () => {
-      const dir = el.getAttribute("data-dir");
-      const cp = el.getAttribute("data-cp");
-      const act = el.getAttribute("data-act");
-      const carId = parseRoute().id;
-      const result = state.cars[carId].results[dir][cp];
-      if (act === "score") result.score = el.value === "" ? null : Number(el.value);
-      if (act === "version") result.versionNote = el.value;
-      if (act === "public") result.publicComment = el.value;
-      if (act === "internal") result.internalComment = el.value;
-      const carState = state.cars[carId];
-      if (carState.status === "created" || carState.status === "published") {
-        if (carState.status !== "published") carState.status = "in_progress";
-      }
-      const head = document.querySelector(`[data-node="${dir}:${cp}"] .node-score`);
-      if (head && act === "score") head.textContent = nodeScoreLabel(result.score);
-      scheduleSave();
-      patchLiveSummaries(carId);
-    };
-    el.addEventListener("change", apply);
-    el.addEventListener("input", apply);
-  });
-  document.querySelectorAll("[data-submit]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const dir = button.getAttribute("data-submit");
-      const carState = state.cars[parseRoute().id];
-      carState.assignments[dir].status = "submitted";
-      carState.status = "in_review";
-      persist();
-      render();
-    });
   });
   document.querySelectorAll("[data-assign]").forEach((select) => {
     select.addEventListener("change", () => {

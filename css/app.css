@@ -79,14 +79,21 @@ h1, h2, h3 { line-height: 1.2; }
   display: flex;
   gap: 1rem;
   align-items: center;
-  background: var(--green);
+  background: #5c564c;
   color: white;
   padding: 1rem 1.2rem;
   border-radius: 20px;
   margin: 0.8rem 0;
 }
+.score-hero.kind-good { background: var(--green); }
+.score-hero.kind-notes { background: #7a5a18; }
+.score-hero.kind-repair,
+.score-hero.has-critical { background: var(--brick); }
+.score-hero.kind-unchecked,
+.score-hero.kind-unpublished { background: #5c564c; }
 .score-hero strong { font-size: 2.4rem; line-height: 1; }
 .score-hero .cond { color: #fff6e8; margin: 0 0 0.25rem; }
+.score-hero .dir-crit { color: #ffe4dc; }
 .btn {
   display: inline-flex;
   align-items: center;
@@ -100,6 +107,8 @@ h1, h2, h3 { line-height: 1.2; }
   min-height: 44px;
   font: inherit;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .btn.ghost { background: transparent; color: var(--green); box-shadow: inset 0 0 0 1.5px var(--green); }
 .btn.wa { background: #1d6b45; width: 100%; text-align: center; margin-top: 0.6rem; }
@@ -139,58 +148,70 @@ dt { color: var(--muted); font-size: 0.82rem; }
   font-size: 0.88rem;
 }
 .legend li { display: flex; gap: 0.35rem; align-items: center; }
-.dir-grid, .dir-stack { display: grid; gap: 0.75rem; }
-.dir-card, .dir-details {
+.dir-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: 1fr;
+}
+.dir-card {
+  display: flex;
+  flex-direction: column;
   background: white;
   border: 1px solid var(--line);
   border-radius: 20px;
   color: inherit;
   text-decoration: none;
-}
-.dir-card {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 0.8rem;
-  align-items: center;
-  padding: 0.85rem;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
   min-height: 44px;
-}
-.dir-details > summary {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 0.8rem;
-  align-items: center;
-  padding: 0.85rem;
-  min-height: 44px;
+  font: inherit;
   cursor: pointer;
-  list-style: none;
 }
-.dir-details > summary::-webkit-details-marker { display: none; }
-.dir-copy h3 { margin: 0 0 0.2rem; font-size: 1.05rem; }
-.dir-svg { width: 72px; height: 72px; display: block; }
-.dir-score { font-size: 1.75rem; font-weight: 750; margin: 0.1rem 0; letter-spacing: -0.03em; }
-.dir-cov { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.88rem; }
+.dir-card.is-static { cursor: default; }
+.dir-illust {
+  display: block;
+  width: 100%;
+  height: 120px;
+  background: #dce8df;
+}
+.dir-svg { width: 100%; height: 120px; display: block; }
+.dir-copy { padding: 0.75rem 0.9rem 0.8rem; }
+.dir-copy h3 { margin: 0 0 0.25rem; font-size: 1.2rem; }
+.dir-score { font-size: 2.05rem; font-weight: 750; margin: 0.15rem 0; letter-spacing: -0.03em; }
+.dir-cov { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.98rem; }
 .more {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   color: var(--green-2);
   font-weight: 600;
+  font-size: 1rem;
 }
 .more::after { content: " ▾"; }
-.dir-details[open] > summary .more::after { content: " ▴"; }
-.kind-good { box-shadow: inset 5px 0 0 var(--green-2); }
-.kind-notes { box-shadow: inset 5px 0 0 var(--gold); }
-.kind-repair { box-shadow: inset 5px 0 0 var(--brick); }
-.kind-unchecked, .kind-unpublished { box-shadow: inset 5px 0 0 #b5aea3; }
-.cond { margin: 0; font-weight: 650; }
+.dir-card.is-selected .more::after { content: " ▴"; }
+.kind-good { box-shadow: inset 0 6px 0 var(--green-2); }
+.kind-notes { box-shadow: inset 0 6px 0 var(--gold); }
+.kind-repair,
+.has-critical { box-shadow: inset 0 6px 0 var(--brick); }
+.kind-unchecked, .kind-unpublished { box-shadow: inset 0 6px 0 #b5aea3; }
+.dir-card.is-selected { outline: 3px solid var(--gold); outline-offset: 2px; }
+.cond {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 650;
+  font-size: 1.02rem;
+}
 .cond-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.3rem;
-  height: 1.3rem;
-  margin-right: 0.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
   border-radius: 999px;
   font-size: 0.8rem;
   background: #efe2c6;
@@ -203,8 +224,23 @@ dt { color: var(--muted); font-size: 0.82rem; }
 .cond-mark.cond-repair { background: #f3d2cc; }
 .cond-unchecked, .cond-unpublished { color: var(--muted); }
 .cond-mark.cond-crit { background: #f3d2cc; color: var(--brick); }
-.dir-crit { margin: 0.25rem 0 0; color: var(--brick); font-weight: 650; font-size: 0.9rem; }
-.dir-panel { padding: 0 0.9rem 0.9rem; border-top: 1px solid var(--line); }
+.dir-crit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0;
+  color: var(--brick);
+  font-weight: 650;
+  font-size: 0.98rem;
+}
+.dir-expand {
+  margin-top: 0.95rem;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 1rem 1.1rem 1.15rem;
+}
+.print-all { display: none; }
 .node {
   background: #fffdf8;
   border: 1px solid var(--line);
@@ -240,8 +276,11 @@ a.dir-card:focus-visible, summary:focus-visible, .btn:focus-visible, select:focu
   outline: 3px solid var(--gold);
   outline-offset: 2px;
 }
-@media (min-width: 700px) {
+@media (min-width: 520px) {
   .dir-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dir-illust, .dir-svg { height: 128px; }
+}
+@media (min-width: 700px) {
   .facts { grid-template-columns: repeat(2, 1fr); }
   .btn.wa { width: auto; }
 }
@@ -251,13 +290,14 @@ a.dir-card:focus-visible, summary:focus-visible, .btn:focus-visible, select:focu
 }
 @media (min-width: 980px) {
   .dir-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dir-illust, .dir-svg { height: 140px; }
 }
 @media print {
-  .badge, .top, .no-print, .back, .more { display: none !important; }
+  .badge, .top, .no-print, .back, .more, .dir-grid, .dir-expand { display: none !important; }
+  .print-all { display: block !important; }
   body { background: white; }
   .wrap { width: auto; margin: 0; }
   a { color: inherit; text-decoration: none; }
   details { display: block; break-inside: avoid; }
   details > *:not(summary) { display: block !important; }
-  .dir-details, .node { box-shadow: none; }
 }

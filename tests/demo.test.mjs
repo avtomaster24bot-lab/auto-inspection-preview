@@ -114,7 +114,7 @@ test("local demo state round-trip", () => {
 });
 
 import { conditionFromScore, summarizeDirection, summarizeOverall, CONDITION_LABELS } from "../js/summary.js";
-import { DIRECTION_ICON_SLUGS } from "../js/icons.js";
+import { DIRECTION_ICON_SLUGS, directionIcon } from "../js/icons.js";
 
 test("unchecked and missing scores never look like zero", () => {
   assert.equal(conditionFromScore(null).label, CONDITION_LABELS.unchecked);
@@ -154,4 +154,13 @@ test("unpublished overview hides live numbers", () => {
 
 test("each diagnostic direction has its own pictogram", () => {
   assert.deepEqual(DIRECTION_ICON_SLUGS.sort(), ["body", "electric", "engine", "geometry", "hodovaya", "interior", "wheels"]);
+});
+
+test("illustrations are large and distinct", () => {
+  const drawn = DIRECTION_ICON_SLUGS.map((slug) => directionIcon(slug));
+  for (const svg of drawn) {
+    assert.match(svg, /viewBox="0 0 200 140"/);
+    assert.match(svg, /data-illustration="/);
+  }
+  assert.equal(new Set(drawn).size, 7);
 });
