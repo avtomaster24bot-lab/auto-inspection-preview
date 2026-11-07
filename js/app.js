@@ -643,7 +643,7 @@ function renderCar(id, route = parseRoute()) {
       ${highlightsHTML(id)}
       ${conditionLegend()}
       <h2>Выберите раздел</h2>
-      <p class="lead">Нажмите кнопку — откроется окно с проверками, фото и видео.</p>
+      <p class="lead">Разделы диагностики: семь отдельных кнопок — сначала ходовая часть, затем кузов, двигатель, электрика и остальные. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>
       ${masterFilterNote()}
       ${directionButtonsHTML(id, dirs)}
       ${finalVerdictHTML(id)}
