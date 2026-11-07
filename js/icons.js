@@ -35,3 +35,8 @@ export function directionIcon(slug) {
   const item = DIRECTION_IMAGES[slug] || DIRECTION_IMAGES.body;
   return `<img class="dir-photo" data-illustration="${slug}" src="${item.src}" alt="${item.alt}" width="640" height="480">`;
 }
+
+export function directionThumb(slug) {
+  const item = DIRECTION_IMAGES[slug] || DIRECTION_IMAGES.body;
+  return `<img class="dir-thumb" data-illustration="${slug}" src="${item.src}" alt="" width="96" height="72">`;
+}

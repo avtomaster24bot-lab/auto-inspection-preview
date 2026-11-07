@@ -1,4 +1,4 @@
-import { computeScores } from "./scoring.js";
+import { computeScores } from "./scoring.js?v=20261108c";
 
 export const DIRECTIONS = [
   {
@@ -150,6 +150,13 @@ export const DIRECTIONS = [
     weight: 1,
   })),
 }));
+
+export const DIRECTION_DISPLAY_ORDER = ["hodovaya", "body", "engine", "electric", "interior", "geometry", "wheels"];
+
+export function orderedDirections(list = DIRECTIONS) {
+  const rank = new Map(DIRECTION_DISPLAY_ORDER.map((slug, index) => [slug, index]));
+  return [...list].sort((a, b) => (rank.get(a.slug) ?? 99) - (rank.get(b.slug) ?? 99));
+}
 
 export const DEMO_MASTERS = [
   { id: "master-1", name: "Демо-мастер №1", directions: ["hodovaya", "wheels"] },

@@ -305,60 +305,59 @@ test("photo gallery thumbnails keep a 120px grid and viewer can upscale", () => 
   assert.equal(css.includes("minmax(96px, 1fr)"), false);
 });
 
-import { panelDomId, toggleOpenDir, hashDirFromOpen } from "../js/routes.js";
+import { directionTitle } from "../js/summary.js";
+import { DIRECTION_DISPLAY_ORDER, orderedDirections } from "../js/data.js";
+import { ASSET_VERSION } from "../js/version.js";
 
-test("category details sit under their own card and toggle independently", () => {
+test("category details open in a compact dialog from buttons", () => {
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  const picker = app.slice(app.indexOf("function directionItemHTML"), app.indexOf("function directionNotesHTML"));
-  assert.match(picker, /class="direction-item"/);
-  assert.match(picker, /panelDomId\(carId, slug\)/);
-  assert.match(picker, /folderPanelHTML\(carId, slug\)/);
-  assert.match(picker, /aria-controls=/);
-  assert.equal(picker.includes('id="dirExpand"'), false);
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  assert.match(app, /function directionButtonsHTML/);
+  assert.match(app, /class="dir-btn/);
+  assert.match(app, /id="categoryDialog"/);
+  assert.match(app, /function openCategoryDialog/);
+  assert.match(app, /data-close-sheet/);
+  assert.match(app, /Назад к списку/);
+  assert.match(app, /data-select-node/);
+  assert.match(app, /data-sheet-tab="checks"/);
   assert.equal(app.includes('id="dirExpand"'), false);
-  const toggleFn = app.slice(app.indexOf("function toggleDirection"), app.indexOf("function bindPicker"));
-  assert.equal(toggleFn.includes("scrollIntoView"), false);
-  assert.match(app, /function toggleDirection/);
-  assert.match(app, /function bindDirJump/);
-  assert.equal(panelDomId("primer-sedan", "hodovaya"), "dir-panel-primer-sedan-hodovaya");
-  assert.notEqual(panelDomId("primer-sedan", "hodovaya"), panelDomId("primer-sedan", "engine"));
-  const first = toggleOpenDir(new Set(), "hodovaya");
-  assert.equal(first.has("hodovaya"), true);
-  const both = toggleOpenDir(first, "engine");
-  assert.equal(both.has("hodovaya"), true);
-  assert.equal(both.has("engine"), true);
-  const afterClose = toggleOpenDir(both, "hodovaya");
-  assert.equal(afterClose.has("hodovaya"), false);
-  assert.equal(afterClose.has("engine"), true);
-  assert.equal(hashDirFromOpen(afterClose, "hodovaya"), "engine");
-  assert.equal(hashDirFromOpen(new Set(), "hodovaya"), null);
+  assert.equal(app.includes("direction-item"), false);
+  assert.equal(app.includes("function toggleDirection"), false);
+  const openFn = app.slice(app.indexOf("function openCategoryDialog"), app.indexOf("function onSheetClose"));
+  assert.equal(openFn.includes("scrollIntoView"), false);
+  assert.match(css, /\.dir-btn h3[\s\S]*overflow-wrap:\s*break-word/);
+  assert.match(css, /\.sheet-dialog[\s\S]*max-height:\s*85vh/);
 });
 
-import { directionTitle } from "../js/summary.js";
-
-test("three named directions stay independent with full electric title", () => {
+test("seven named directions stay independent with requested button order", () => {
   const bySlug = Object.fromEntries(DIRECTIONS.map((direction) => [direction.slug, direction]));
   assert.equal(DIRECTIONS.length, 7);
   assert.equal(new Set(DIRECTIONS.map((direction) => direction.slug)).size, 7);
-  assert.equal(bySlug.hodovaya.name, "Ходовая часть");
+  assert.deepEqual(DIRECTION_DISPLAY_ORDER, ["hodovaya", "body", "engine", "electric", "interior", "geometry", "wheels"]);
+  assert.deepEqual(
+    orderedDirections(DIRECTIONS).map((direction) => directionTitle(direction.slug, direction.name)),
+    [
+      "Ходовая часть",
+      "Кузов",
+      "Двигатель",
+      "Электроприборы и электрооборудование",
+      "Салон",
+      "Геометрия / Лонжероны",
+      "Колёса и резина",
+    ],
+  );
   assert.equal(bySlug.hodovaya.checkpoints.length, 21);
-  assert.equal(bySlug.engine.name, "Двигатель");
   assert.equal(bySlug.engine.checkpoints.length, 14);
   assert.equal(bySlug.electric.slug, "electric");
   assert.equal(bySlug.electric.name, "Электроприборы и электрооборудование");
   assert.equal(bySlug.electric.checkpoints.length, 14);
   assert.equal(directionTitle("electric", "Электрика"), "Электроприборы и электрооборудование");
-  assert.equal(directionTitle("hodovaya"), "Ходовая часть");
-  assert.equal(directionTitle("engine"), "Двигатель");
-  assert.ok(DIRECTION_IMAGES.hodovaya);
-  assert.ok(DIRECTION_IMAGES.engine);
-  assert.ok(DIRECTION_IMAGES.electric);
+  assert.equal(directionTitle("geometry"), "Геометрия / Лонжероны");
+  assert.ok(DIRECTION_IMAGES.hodovaya && DIRECTION_IMAGES.body && DIRECTION_IMAGES.engine && DIRECTION_IMAGES.electric);
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(app, /Список проверок — \$\{direction\.checkpoints\.length\} узлов/);
   assert.equal(app.includes("Узлы направления"), false);
-  assert.equal(app.includes("Электрика"), false);
   assert.match(app, /Разделы диагностики/);
-  assert.match(app, /function directionNavHTML/);
+  assert.match(app, /function directionButtonsHTML/);
   const state = createDefaultState();
   assert.equal(Object.keys(state.cars["primer-sedan"].results.hodovaya).length, 21);
   assert.equal(Object.keys(state.cars["primer-sedan"].results.engine).length, 14);
@@ -366,4 +365,37 @@ test("three named directions stay independent with full electric title", () => {
   assert.equal(state.cars["primer-sedan"].assignments.hodovaya.masterId, "master-1");
   assert.equal(state.cars["primer-sedan"].assignments.engine.masterId, "master-2");
   assert.equal(state.cars["primer-sedan"].assignments.electric.masterId, "master-2");
+  assert.equal(state.cars["primer-sedan"].assignments.body.masterId, "master-3");
+});
+
+test("share falls back without claiming success and install uses a real manifest", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+  const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
+  const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../manifest.webmanifest", import.meta.url)), "utf8"));
+  assert.match(app, /function sharePage/);
+  assert.match(app, /navigator\.share/);
+  assert.match(app, /clipboard\.writeText/);
+  assert.match(app, /Ссылка скопирована/);
+  assert.match(app, /AbortError/);
+  assert.match(app, /copyFallback/);
+  assert.match(app, /beforeinstallprompt/);
+  assert.match(app, /Поделиться → На экран «Домой»/);
+  assert.match(app, /не установка из магазина приложений/);
+  assert.match(html, new RegExp(`css/app.css\\?v=${ASSET_VERSION}`));
+  assert.match(html, new RegExp(`js/app.js\\?v=${ASSET_VERSION}`));
+  assert.match(html, /rel="manifest"/);
+  assert.match(html, /apple-touch-icon/);
+  assert.match(app, new RegExp(`from "./data.js\\?v=${ASSET_VERSION}"`));
+  assert.equal(manifest.scope, "/auto-inspection-preview/");
+  assert.equal(manifest.start_url, "/auto-inspection-preview/");
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.short_name, "АвтоМастер24");
+  assert.match(sw, /am24-shell-\$\{VERSION\}/);
+  assert.match(sw, new RegExp(`const VERSION = "${ASSET_VERSION}"`));
+  assert.match(sw, /blob:/);
+  assert.match(sw, /data:/);
+  assert.equal(existsSync(new URL("../images/icon-192.png", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../images/icon-512.png", import.meta.url)), true);
+  assert.equal(existsSync(new URL("../images/apple-touch-icon.png", import.meta.url)), true);
 });

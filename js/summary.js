@@ -1,4 +1,4 @@
-import { formatScore } from "./scoring.js";
+import { formatScore } from "./scoring.js?v=20261108c";
 
 export const CONDITION_GOOD_MIN = 8;
 export const CONDITION_NOTES_MIN = 5;
@@ -17,7 +17,7 @@ export const DIRECTION_TITLES = {
   electric: "Электроприборы и электрооборудование",
   body: "Кузов",
   interior: "Салон",
-  geometry: "Геометрия и лонжероны",
+  geometry: "Геометрия / Лонжероны",
   wheels: "Колёса и резина",
 };
 

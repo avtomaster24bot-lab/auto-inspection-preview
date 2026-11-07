@@ -1,11 +1,11 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape } from "./data.js";
-import { FORMULA_DISCLAIMER } from "./scoring.js";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js";
-import { loadState, saveState, clearState } from "./storage.js";
-import { summarizeDirection, summarizeOverall, directionTitle } from "./summary.js";
-import { directionIcon } from "./icons.js";
-import { folderKey, nodeFolderKey } from "./folder.js";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash, panelDomId, toggleOpenDir, hashDirFromOpen } from "./routes.js";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108c";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108c";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108c";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108c";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108c";
+import { directionThumb } from "./icons.js?v=20261108c";
+import { folderKey } from "./folder.js?v=20261108c";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108c";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -15,7 +15,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js";
+} from "./media.js?v=20261108c";
+import { ASSET_VERSION } from "./version.js?v=20261108c";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -24,8 +25,13 @@ const STATUS_LABEL = {
   published: "опубликован",
 };
 
-const openDirs = new Set();
-const openNodes = new Set();
+const MASTER_FILTER_NOTE =
+  "В режиме мастера — только назначенные разделы; посмотреть все в режиме покупателя (опубликованный отчёт)/администратора";
+
+let sheetDir = null;
+let sheetNode = null;
+let sheetPane = "checks";
+let lastDirTrigger = null;
 let lastViewerTrigger = null;
 
 let state = hydrate();
@@ -123,8 +129,8 @@ function overviewFor(carId) {
 }
 
 function visibleDirections(carState) {
-  if (state.role !== "master") return DIRECTIONS;
-  return DIRECTIONS.filter((direction) => carState.assignments[direction.slug]?.masterId === state.masterId);
+  const list = state.role !== "master" ? DIRECTIONS : DIRECTIONS.filter((direction) => carState.assignments[direction.slug]?.masterId === state.masterId);
+  return orderedDirections(list);
 }
 
 function whatsappHref(car) {
@@ -137,11 +143,11 @@ function whatsappHref(car) {
   });
 }
 
-function carPhoto(car, extraClass = "") {
+function carPhoto(car, extraClass = "", caption = "Учебная иллюстрация, не фото осмотра") {
   if (!car?.image) return "";
   return `<figure class="${extraClass}">
     <img src="${car.image}" alt="${escapeHtml(car.imageAlt || `${car.make} ${car.model}`)}" width="640" height="480">
-    <figcaption>Учебная иллюстрация, не фото осмотра</figcaption>
+    <figcaption>${escapeHtml(caption)}</figcaption>
   </figure>`;
 }
 
@@ -166,7 +172,21 @@ function header() {
     <nav>
       <a href="#/">Все автомобили</a>
       <button type="button" class="mode-toggle" id="modeToggle" aria-haspopup="dialog">Режим работы (демо): ${escapeHtml(roleLabel())}</button>
+      <button type="button" class="btn ghost header-action" id="sharePage">Поделиться</button>
+      <button type="button" class="btn ghost header-action" id="installApp">Установить на телефон</button>
     </nav>
+    <p id="actionStatus" class="hint action-status" role="status" hidden></p>
+    <dialog id="iosInstallHelp" class="mode-dialog">
+      <h2>Как добавить на телефон</h2>
+      <p>На iPhone или iPad нажмите «Поделиться → На экран «Домой»». Это ярлык этого сайта, а не установка из магазина приложений и не синхронизация аккаунта. Данные по-прежнему хранятся только в этом браузере.</p>
+      <button type="button" class="btn" id="iosInstallClose">Понятно</button>
+    </dialog>
+    <dialog id="copyHelp" class="mode-dialog">
+      <h2>Скопируйте ссылку</h2>
+      <p>Автоматическое копирование недоступно. Выделите ссылку и скопируйте её вручную.</p>
+      <textarea id="copyFallback" readonly rows="3"></textarea>
+      <button type="button" class="btn" id="copyHelpClose">Закрыть</button>
+    </dialog>
     <dialog id="modeDialog" class="mode-dialog">
       <h2>Режим работы (демо)</h2>
       <p>Это учебный переключатель вида, а не вход в систему и не выдача прав.</p>
@@ -258,26 +278,6 @@ function highlightsHTML(carId) {
   </section>`;
 }
 
-function cardFace(direction, summary, more) {
-  return `<span class="dir-illust">${directionIcon(direction.slug)}</span>
-    <div class="dir-copy">
-      <h3>${directionTitle(direction.slug, direction.name)}</h3>
-      <div data-summary-body="${direction.slug}">${summaryFields(summary)}</div>
-      <span class="more">${more}</span>
-    </div>`;
-}
-
-function directionItemHTML(carId, direction, summary, open) {
-  const slug = direction.slug;
-  const pid = panelDomId(carId, slug);
-  return `<article class="direction-item" data-direction-item="${slug}">
-    <button type="button" class="dir-card ${severityClass(summary)}${open ? " is-selected" : ""}" data-select-dir="${slug}" aria-expanded="${open ? "true" : "false"}" aria-controls="${pid}">
-      ${cardFace(direction, summary, open ? "Скрыть подробности" : "Открыть подробности")}
-    </button>
-    <div id="${pid}" class="dir-expand" data-dir-panel="${slug}" data-car="${carId}" ${open ? "" : "hidden"}>${open ? folderPanelHTML(carId, slug) : ""}</div>
-  </article>`;
-}
-
 function directionNotesHTML(carId, slug, editable) {
   ensureCarShape(state.cars[carId]);
   const notes = state.cars[carId].directionNotes[slug];
@@ -296,7 +296,7 @@ function directionNotesHTML(carId, slug, editable) {
     </section>`;
   }
   return `<section class="dir-notes">
-    <h3>Кратко</h3>
+    <h3>Описание направления</h3>
     <p>${notes.publicComment ? escapeHtml(notes.publicComment) : "Описание направления пока не заполнено."}</p>
     ${canSeeInternal() && notes.internalComment ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(notes.internalComment)}</div>` : ""}
   </section>`;
@@ -310,32 +310,27 @@ function emptyVideoText() {
   return canEdit() ? "Добавьте видео состояния узла" : "Материалы пока не добавлены";
 }
 
-function mediaSectionsHTML(carId, slug, editable) {
+function mediaPaneHTML(carId, slug, kind) {
   const key = folderKey(carId, slug);
-  return `<section class="media-folders" data-media-folder="${escapeHtml(key)}" data-car="${carId}" data-dir="${slug}">
-    <div class="media-tabs" role="tablist" aria-label="Фото и видео направления">
-      <button type="button" role="tab" aria-selected="true" data-media-tab="photo">Фото (<span data-photo-count>0</span>)</button>
-      <button type="button" role="tab" aria-selected="false" data-media-tab="video">Видео (<span data-video-count>0</span>)</button>
-    </div>
-    <div data-photo-panel>
-      <div class="photo-gallery" data-photo-gallery><p class="empty-media">${emptyPhotoText()}</p></div>
-      ${
-        editable
-          ? `<label class="btn ghost file-btn">Добавить фото
+  const editable = canEdit();
+  const photoUpload = editable
+    ? `<label class="btn ghost file-btn">Добавить фото
         <input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" data-media-upload="photo" data-car="${carId}" data-dir="${slug}">
       </label>`
-          : ""
-      }
-    </div>
-    <div data-video-panel hidden>
-      <div class="video-gallery" data-video-gallery><p class="empty-media">${emptyVideoText()}</p></div>
-      ${
-        editable
-          ? `<label class="btn ghost file-btn">Добавить видео
+    : "";
+  const videoUpload = editable
+    ? `<label class="btn ghost file-btn">Добавить видео
         <input type="file" hidden multiple accept="video/mp4,video/webm,video/quicktime" data-media-upload="video" data-car="${carId}" data-dir="${slug}">
       </label>`
-          : ""
-      }
+    : "";
+  return `<section class="media-folders" data-media-folder="${escapeHtml(key)}" data-car="${carId}" data-dir="${slug}">
+    <div data-photo-panel ${kind === "photo" ? "" : "hidden"}>
+      <div class="photo-gallery" data-photo-gallery><p class="empty-media">${emptyPhotoText()}</p></div>
+      ${photoUpload}
+    </div>
+    <div data-video-panel ${kind === "video" ? "" : "hidden"}>
+      <div class="video-gallery" data-video-gallery><p class="empty-media">${emptyVideoText()}</p></div>
+      ${videoUpload}
     </div>
     <p class="hint">${MEDIA_LIMITS_TEXT}</p>
     <p class="hint upload-status" data-media-status role="status"></p>
@@ -346,89 +341,69 @@ function mediaSectionsHTML(carId, slug, editable) {
   </section>`;
 }
 
-function inspectNode(carId, direction, checkpoint, result) {
-  const key = nodeFolderKey(carId, direction.slug, checkpoint.slug);
-  const scoreOptions = [`<option value="" ${result.score == null ? "selected" : ""}>не проверено</option>`]
-    .concat(Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${result.score === n ? "selected" : ""}>${n}</option>`))
-    .join("");
-  const internal =
-    canSeeInternal()
-      ? `<label>Внутренний комментарий (скрыт от покупателя)
-          <textarea data-act="internal" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${escapeHtml(result.internalComment || "")}</textarea>
-        </label>`
-      : "";
-  return `<details class="node" data-node="${key}"${openNodes.has(key) ? " open" : ""}>
-    <summary>
-      <span>${checkpoint.name} ${checkpoint.isCritical ? `<span class="crit">критичный</span>` : ""}</span>
-      <span class="node-score">${nodeScoreLabel(result.score)}</span>
-    </summary>
-    <div class="node-body">
-      <label>Оценка
-        <select data-act="score" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${scoreOptions}</select>
-      </label>
-      <label>Версия / модификация
-        <input data-act="version" data-dir="${direction.slug}" data-cp="${checkpoint.slug}" value="${escapeHtml(result.versionNote || "")}">
-      </label>
-      <label>Публичный комментарий
-        <textarea data-act="public" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${escapeHtml(result.publicComment || "")}</textarea>
-      </label>
-      ${internal}
-    </div>
-  </details>`;
-}
-
-function readOnlyNode(carId, direction, checkpoint, result) {
-  const key = `ro:${nodeFolderKey(carId, direction.slug, checkpoint.slug)}`;
-  const internal =
-    canSeeInternal() && result.internalComment
-      ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(result.internalComment)}</div>`
-      : "";
-  return `<details class="node" data-node="${key}"${openNodes.has(key) ? " open" : ""}>
-    <summary>
-      <span>${checkpoint.name} ${checkpoint.isCritical ? `<span class="crit">критичный</span>` : ""}</span>
-      <span class="node-score">${nodeScoreLabel(result.score)}</span>
-    </summary>
-    <div class="node-body">
-      <p><strong>Версия:</strong> ${escapeHtml(result.versionNote || "—")}</p>
-      <p><strong>Комментарий:</strong> ${escapeHtml(result.publicComment || "—")}</p>
-      ${internal}
-    </div>
-  </details>`;
-}
-
 function nodeScoreLabel(score) {
   return score == null ? "не проверено" : `${score}/10`;
 }
 
-function folderPanelHTML(carId, slug) {
-  const carState = state.cars[carId];
-  const direction = DIRECTIONS.find((item) => item.slug === slug);
-  const car = carMeta(carId);
-  if (!direction || !carState) return `<p>Направление не найдено</p>`;
-  if (state.role === "buyer" && carState.status !== "published") {
-    return `<p>Оценочный лист ещё не опубликован. Описание, оценки, фото и видео этого направления скрыты.</p>`;
-  }
-  const editable = canEdit();
-  const assignment = carState.assignments[slug];
-  const nodes = direction.checkpoints
-    .map((checkpoint) =>
-      editable
-        ? inspectNode(carId, direction, checkpoint, carState.results[slug][checkpoint.slug])
-        : readOnlyNode(carId, direction, checkpoint, carState.results[slug][checkpoint.slug]),
-    )
+function nodeChipKind(result) {
+  if (!result || result.score == null) return "unchecked";
+  return conditionFromScore(result.score).kind;
+}
+
+function nodeListHTML(carId, direction) {
+  const results = state.cars[carId].results[direction.slug] || {};
+  return `<div class="node-list">
+    ${direction.checkpoints
+      .map((checkpoint) => {
+        const result = results[checkpoint.slug] || {};
+        return `<button type="button" class="node-chip kind-${nodeChipKind(result)}" data-select-node="${checkpoint.slug}">
+          <span>${escapeHtml(checkpoint.name)}${checkpoint.isCritical ? ` <span class="crit">критичный</span>` : ""}</span>
+          <span class="node-score" data-node-score="${checkpoint.slug}">${nodeScoreLabel(result.score)}</span>
+        </button>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+function nodeEditorHTML(direction, checkpoint, result) {
+  const scoreOptions = [`<option value="" ${result.score == null ? "selected" : ""}>не проверено</option>`]
+    .concat(Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${result.score === n ? "selected" : ""}>${n}</option>`))
     .join("");
-  return `<h3>${directionTitle(slug, direction.name)}</h3>
-    <p class="hint">Подробности только этого автомобиля: «${car ? `${car.make} ${car.model}` : carId}». ${
-      assignment ? `Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment.masterId)?.name || "не назначен"} · ${assignment.status}.` : ""
-    }</p>
-    ${directionNotesHTML(carId, slug, editable)}
-    ${mediaSectionsHTML(carId, slug, editable)}
-    <details class="check-list" open>
-      <summary>Список проверок — ${direction.checkpoints.length} узлов</summary>
-      <p class="hint">Откройте нужный пункт — все ${direction.checkpoints.length} сразу не показаны.</p>
-      ${nodes}
-    </details>
-    ${state.role === "master" && editable ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}`;
+  const internal = canSeeInternal()
+    ? `<label>Внутренний комментарий (скрыт от покупателя)
+        <textarea data-act="internal" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${escapeHtml(result.internalComment || "")}</textarea>
+      </label>`
+    : "";
+  return `<label>Оценка
+      <select data-act="score" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${scoreOptions}</select>
+    </label>
+    <label>Версия / модификация
+      <input data-act="version" data-dir="${direction.slug}" data-cp="${checkpoint.slug}" value="${escapeHtml(result.versionNote || "")}">
+    </label>
+    <label>Публичный комментарий
+      <textarea data-act="public" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${escapeHtml(result.publicComment || "")}</textarea>
+    </label>
+    ${internal}`;
+}
+
+function nodeReadHTML(checkpoint, result) {
+  const internal =
+    canSeeInternal() && result.internalComment
+      ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(result.internalComment)}</div>`
+      : "";
+  return `<p><strong>Оценка:</strong> ${nodeScoreLabel(result.score)}</p>
+    <p><strong>Версия:</strong> ${escapeHtml(result.versionNote || "—")}</p>
+    <p><strong>Комментарий:</strong> ${escapeHtml(result.publicComment || "—")}</p>
+    ${internal}`;
+}
+
+function nodeDetailHTML(carId, direction, checkpoint, result) {
+  return `<div class="node-detail">
+    <button type="button" class="text-btn" data-back-nodes>Назад к списку</button>
+    <h3>${escapeHtml(checkpoint.name)} ${checkpoint.isCritical ? `<span class="crit">критичный</span>` : ""}</h3>
+    <p class="node-score" data-node-score="${checkpoint.slug}">${nodeScoreLabel(result.score)}</p>
+    ${canEdit() ? nodeEditorHTML(direction, checkpoint, result) : nodeReadHTML(checkpoint, result)}
+  </div>`;
 }
 
 function printAllHTML(carId, dirs) {
@@ -452,31 +427,88 @@ function printAllHTML(carId, dirs) {
     .join("")}</div>`;
 }
 
-function directionNavHTML(carId, dirs) {
-  if (!dirs.length) return "";
-  const items = dirs
+function carSchemeHTML(dirs, scores, unpublished) {
+  const labels = dirs
     .map((direction) => {
+      const summary = summarizeDirection(scores.directionScores.find((item) => item.id === direction.slug), { unpublished });
       const title = directionTitle(direction.slug, direction.name);
-      const open = openDirs.has(direction.slug);
-      return `<li><button type="button" class="dir-jump-btn${open ? " is-current" : ""}" data-jump-dir="${direction.slug}">${escapeHtml(title)}</button></li>`;
+      return `<li><button type="button" class="scheme-hot ${severityClass(summary)}" data-select-dir="${direction.slug}" aria-haspopup="dialog" aria-controls="categoryDialog" aria-expanded="false">${escapeHtml(title)}</button></li>`;
     })
     .join("");
-  return `<nav class="dir-jump no-print" aria-label="Разделы диагностики">
-    <h3>Разделы диагностики</h3>
-    <ol>${items}</ol>
-  </nav>`;
+  return `<figure class="car-scheme">
+    <figcaption>Схема автомобиля</figcaption>
+    <svg class="scheme-svg" viewBox="0 0 560 240" role="img" aria-label="Контур автомобиля сверху, без отметок повреждений">
+      <rect class="scheme-wheel" x="150" y="18" width="78" height="26" rx="10"/>
+      <rect class="scheme-wheel" x="150" y="196" width="78" height="26" rx="10"/>
+      <rect class="scheme-wheel" x="340" y="18" width="78" height="26" rx="10"/>
+      <rect class="scheme-wheel" x="340" y="196" width="78" height="26" rx="10"/>
+      <path class="scheme-body" d="M92 58 h300 q48 0 78 28 l42 22 v24 l-42 22 q-30 28 -78 28 H92 q-36 0 -52 -30 V88 q16 -30 52 -30 z"/>
+      <rect class="scheme-hood" x="390" y="78" width="88" height="84" rx="12"/>
+      <rect class="scheme-cabin" x="210" y="78" width="160" height="84" rx="14"/>
+      <path class="scheme-glass" d="M372 86 v68 l28 -16 v-36 z"/>
+      <line class="scheme-spine" x1="108" y1="120" x2="452" y2="120"/>
+    </svg>
+    <ul class="scheme-labels">${labels}</ul>
+    <p class="hint">Метки показывают разделы осмотра, а не точные места повреждений.</p>
+  </figure>`;
 }
 
-function directionPicker(carId, dirs, scores, unpublished) {
+function directionButtonHTML(direction, summary) {
+  const title = directionTitle(direction.slug, direction.name);
+  return `<button type="button" class="dir-btn ${severityClass(summary)}" data-select-dir="${direction.slug}" aria-haspopup="dialog" aria-controls="categoryDialog" aria-expanded="false">
+    ${directionThumb(direction.slug)}
+    <span class="dir-btn-copy">
+      <h3>${escapeHtml(title)}</h3>
+      <span data-summary-body="${direction.slug}">${summaryFields(summary)}</span>
+    </span>
+  </button>`;
+}
+
+function directionButtonsHTML(dirs, scores, unpublished) {
   if (!dirs.length) return `<p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>`;
   const items = dirs
     .map((direction) => {
       const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
       const summary = summarizeDirection(dirScore, { unpublished });
-      return directionItemHTML(carId, direction, summary, openDirs.has(direction.slug));
+      return directionButtonHTML(direction, summary);
     })
     .join("");
-  return `<div class="dir-grid">${items}</div>`;
+  return `<div class="dir-buttons">${items}</div>`;
+}
+
+function masterFilterNote() {
+  if (state.role !== "master") return "";
+  return `<p class="hint master-note" role="note">${MASTER_FILTER_NOTE}</p>`;
+}
+
+function sheetDialogHTML() {
+  return `<dialog id="categoryDialog" class="sheet-dialog" aria-labelledby="catDialogTitle">
+    <div class="sheet-inner">
+      <header class="sheet-head">
+        <div class="sheet-head-main">
+          <span id="catDialogThumb" class="sheet-thumb"></span>
+          <div>
+            <h2 id="catDialogTitle"></h2>
+            <div id="catDialogSummary"></div>
+          </div>
+        </div>
+        <div class="sheet-head-actions">
+          <button type="button" class="btn" data-close-sheet>Готово</button>
+          <button type="button" class="sheet-x" data-close-sheet aria-label="Закрыть">×</button>
+        </div>
+      </header>
+      <div class="sheet-tabs" role="tablist" aria-label="Содержание раздела" id="catDialogTabs"></div>
+      <div class="sheet-body" id="catDialogBody"></div>
+    </div>
+  </dialog>`;
+}
+
+function sheetTabsHTML(direction, pane) {
+  const count = direction.checkpoints.length;
+  return `<button type="button" role="tab" data-sheet-tab="checks" aria-selected="${pane === "checks" ? "true" : "false"}">Проверки (${count})</button>
+    <button type="button" role="tab" data-sheet-tab="photo" aria-selected="${pane === "photo" ? "true" : "false"}">Фото (<span data-photo-count>0</span>)</button>
+    <button type="button" role="tab" data-sheet-tab="video" aria-selected="${pane === "video" ? "true" : "false"}">Видео (<span data-video-count>0</span>)</button>
+    <button type="button" role="tab" data-sheet-tab="notes" aria-selected="${pane === "notes" ? "true" : "false"}">Описание</button>`;
 }
 
 function carCard(car) {
@@ -521,8 +553,6 @@ function renderCar(id, route = parseRoute()) {
   if (!car || !carState) return `${header()}<main class="wrap"><h1>Образец не найден</h1></main>`;
   const { scores, unpublished } = overviewFor(id);
   const dirs = visibleDirections(carState);
-  const selected = route.dir && dirs.some((item) => item.slug === route.dir) ? route.dir : null;
-  if (selected) openDirs.add(selected);
   const conclusion =
     state.role === "buyer" && carState.publishedSnapshot
       ? carState.publishedSnapshot.conclusion
@@ -534,11 +564,12 @@ function renderCar(id, route = parseRoute()) {
         <span aria-hidden="true">/</span>
         <span>${car.make} ${car.model}, ${car.year}</span>
       </nav>
-      <p class="tag">Папка автомобиля · ${car.label}</p>
+      <p class="tag">Оценочный лист · ${car.label}</p>
       <h1>${car.make} ${car.model}, ${car.year}</h1>
-      <div class="assessment-head">
-        ${carPhoto(car, "hero-visual")}
-        <div>
+      <section class="sheet-top">
+        ${carPhoto(car, "hero-visual photo-auto", "Фото авто · учебная иллюстрация, не фото реального осмотра")}
+        ${unpublished ? "" : carSchemeHTML(dirs, scores, unpublished)}
+        <div class="sheet-facts">
           <dl class="facts">
             <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
             <div><dt>Цвет</dt><dd>${car.color}</dd></div>
@@ -548,25 +579,26 @@ function renderCar(id, route = parseRoute()) {
           </dl>
           ${overallHero(id)}
         </div>
-      </div>
+      </section>
       ${unpublished ? unpublishedBlock(car) : ""}
       ${unpublished ? "" : `<p class="formula">${FORMULA_DISCLAIMER}</p>`}
       ${unpublished ? "" : highlightsHTML(id)}
       ${!unpublished && conclusion ? `<section class="highlights"><h2>Заключение</h2><p>${escapeHtml(conclusion)}</p></section>` : ""}
       ${unpublished ? "" : conditionLegend()}
-      ${unpublished ? "" : `<h2>Диагностика по направлениям</h2><p class="lead">Нажмите картинку, чтобы открыть описание, фото, видео и список узлов. Ходовая часть, двигатель и электроприборы — отдельные разделы в начале списка.</p>`}
-      ${unpublished ? "" : directionNavHTML(id, dirs)}
-      ${unpublished ? "" : directionPicker(id, dirs, scores, unpublished)}
+      ${unpublished ? "" : `<h2>Разделы диагностики</h2><p class="lead">Семь отдельных кнопок: сначала ходовая часть, затем кузов, двигатель, электрика и остальные разделы. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>`}
+      ${unpublished ? "" : masterFilterNote()}
+      ${unpublished ? "" : directionButtonsHTML(dirs, scores, unpublished)}
       ${unpublished ? "" : `<p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>`}
       ${unpublished ? "" : printAllHTML(id, dirs)}
       ${renderWhatsApp(car)}
+      ${sheetDialogHTML()}
     </main>`;
 }
 
 function renderAdmin() {
   const blocks = SAMPLE_CARS.map((car) => {
     const carState = state.cars[car.id];
-    const rows = DIRECTIONS.map((direction) => {
+    const rows = orderedDirections(DIRECTIONS).map((direction) => {
       const assignment = carState.assignments[direction.slug];
       const options = [`<option value="">не назначен</option>`]
         .concat(DEMO_MASTERS.map((master) => `<option value="${master.id}" ${assignment.masterId === master.id ? "selected" : ""}>${master.name}</option>`))
@@ -608,22 +640,23 @@ function escapeHtml(value) {
 
 function render() {
   revokeAllObjectUrls();
+  sheetDir = null;
+  sheetNode = null;
+  sheetPane = "checks";
   const route = parseRoute();
   if (isCarRoute(route) && location.hash !== canonicalHash(route)) {
     history.replaceState(null, "", canonicalHash(route));
   }
-  if (route.dir) openDirs.add(route.dir);
   let html = renderHome();
   if (isCarRoute(route)) html = renderCar(route.id, route);
   if (route.name === "admin") html = renderAdmin();
   document.getElementById("app").innerHTML = html;
   document.title = pageTitle(route);
   bind();
-  if (isCarRoute(route) && route.id) {
-    for (const slug of openDirs) {
-      const panel = document.getElementById(panelDomId(route.id, slug));
-      if (panel && !panel.hidden) hydrateMedia(route.id, slug, panel);
-    }
+  if (isCarRoute(route) && route.id && route.dir) {
+    const carState = state.cars[route.id];
+    const allowed = carState ? visibleDirections(carState).some((item) => item.slug === route.dir) : false;
+    if (allowed) openCategoryDialog(route.dir, { updateHash: false });
   }
 }
 
@@ -633,6 +666,12 @@ function pageTitle(route) {
     if (car) return `АвтоМастер24-Трейд-ин_оценочный-лист_${car.make}-${car.model}-${car.year}_демо`.replaceAll(" ", "-");
   }
   return "АвтоМастер24 / Трейд-ин — демонстрация осмотра";
+}
+
+function applySeverityClass(el, summary) {
+  const selected = el.classList.contains("is-selected");
+  const bases = [...el.classList].filter((name) => !name.startsWith("kind-") && name !== "has-critical" && name !== "is-selected");
+  el.className = `${bases.join(" ")} ${severityClass(summary)}${selected ? " is-selected" : ""}`.trim();
 }
 
 function patchLiveSummaries(carId) {
@@ -645,102 +684,165 @@ function patchLiveSummaries(carId) {
     document.querySelectorAll(`[data-summary-body="${direction.slug}"]`).forEach((holder) => {
       holder.innerHTML = summaryFields(summary);
     });
-    document.querySelectorAll(`[data-select-dir="${direction.slug}"]`).forEach((el) => {
-      if (!el.querySelector(`[data-summary-body="${direction.slug}"]`)) return;
-      const selected = el.classList.contains("is-selected");
-      el.className = `dir-card ${severityClass(summary)}${selected ? " is-selected" : ""}`;
-    });
+    document.querySelectorAll(`[data-select-dir="${direction.slug}"]`).forEach((el) => applySeverityClass(el, summary));
+    if (sheetDir === direction.slug) {
+      const dialogSummary = document.getElementById("catDialogSummary");
+      if (dialogSummary) dialogSummary.innerHTML = summaryFields(summary);
+    }
   }
 }
 
-function bindDisclosure(root = document) {
-  root.querySelectorAll("details[data-node]").forEach((el) => {
-    el.addEventListener("toggle", () => {
-      const key = el.getAttribute("data-node");
-      if (el.open) openNodes.add(key);
-      else openNodes.delete(key);
+function syncDirButtons(slug) {
+  document.querySelectorAll("[data-select-dir]").forEach((el) => {
+    const on = Boolean(slug) && el.getAttribute("data-select-dir") === slug;
+    el.classList.toggle("is-selected", on);
+    el.setAttribute("aria-expanded", on ? "true" : "false");
+  });
+}
+
+function fillSheetBody(carId, direction) {
+  const body = document.getElementById("catDialogBody");
+  if (!body) return;
+  const carState = state.cars[carId];
+  if (state.role === "buyer" && carState.status !== "published") {
+    body.innerHTML = "<p>Оценочный лист ещё не опубликован. Описание, оценки, фото и видео этого направления скрыты.</p>";
+    return;
+  }
+  if (sheetPane === "notes") {
+    body.innerHTML = `${directionNotesHTML(carId, direction.slug, canEdit())}
+      ${state.role === "master" && canEdit() ? `<button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button>` : ""}`;
+    bindFieldRoot(body);
+    return;
+  }
+  if (sheetPane === "photo" || sheetPane === "video") {
+    body.innerHTML = mediaPaneHTML(carId, direction.slug, sheetPane);
+    bindMediaSection(body);
+    hydrateMedia(carId, direction.slug, body);
+    return;
+  }
+  if (sheetNode) {
+    const checkpoint = direction.checkpoints.find((item) => item.slug === sheetNode);
+    const result = carState.results[direction.slug][sheetNode];
+    if (!checkpoint || !result) {
+      sheetNode = null;
+    } else {
+      body.innerHTML = nodeDetailHTML(carId, direction, checkpoint, result);
+      bindFieldRoot(body);
+      body.querySelector("[data-back-nodes]")?.addEventListener("click", () => {
+        sheetNode = null;
+        fillSheetBody(carId, direction);
+      });
+      return;
+    }
+  }
+  body.innerHTML = `<p class="hint">Выберите пункт проверки — ${direction.checkpoints.length} узлов.</p>
+    ${nodeListHTML(carId, direction)}
+    ${state.role === "master" && canEdit() ? `<p><button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button></p>` : ""}`;
+  body.querySelectorAll("[data-select-node]").forEach((button) => {
+    button.addEventListener("click", () => {
+      sheetNode = button.getAttribute("data-select-node");
+      fillSheetBody(carId, direction);
+    });
+  });
+  bindFieldRoot(body);
+}
+
+function fillSheet(carId, slug) {
+  const direction = DIRECTIONS.find((item) => item.slug === slug);
+  if (!direction) return;
+  const { scores, unpublished } = overviewFor(carId);
+  const summary = summarizeDirection(
+    scores.directionScores.find((item) => item.id === slug),
+    { unpublished },
+  );
+  const title = document.getElementById("catDialogTitle");
+  const summaryBox = document.getElementById("catDialogSummary");
+  const thumb = document.getElementById("catDialogThumb");
+  const tabs = document.getElementById("catDialogTabs");
+  if (title) title.textContent = directionTitle(slug, direction.name);
+  if (summaryBox) summaryBox.innerHTML = summaryFields(summary);
+  if (thumb) thumb.innerHTML = directionThumb(slug);
+  if (tabs) tabs.innerHTML = sheetTabsHTML(direction, sheetPane);
+  fillSheetBody(carId, direction);
+  tabs?.querySelectorAll("[data-sheet-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      sheetPane = tab.getAttribute("data-sheet-tab");
+      sheetNode = null;
+      fillSheet(carId, slug);
     });
   });
 }
 
-function syncDirButton(slug, open) {
-  document.querySelectorAll(`[data-select-dir="${slug}"]`).forEach((el) => {
-    el.classList.toggle("is-selected", open);
-    el.setAttribute("aria-expanded", open ? "true" : "false");
-    const more = el.querySelector(".more");
-    if (more) more.textContent = open ? "Скрыть подробности" : "Открыть подробности";
-  });
-}
-
-function expandDirectionPanel(carId, slug) {
-  const panel = document.getElementById(panelDomId(carId, slug));
-  if (!panel) return;
-  if (!panel.innerHTML.trim()) {
-    panel.innerHTML = folderPanelHTML(carId, slug);
-    bindFieldRoot(panel);
-    bindDisclosure(panel);
-    bindMediaSection(panel);
-    hydrateMedia(carId, slug, panel);
-  }
-  panel.hidden = false;
-}
-
-function collapseDirectionPanel(carId, slug) {
-  const panel = document.getElementById(panelDomId(carId, slug));
-  if (!panel) return;
-  revokeFolderObjectUrls(carId, slug);
-  panel.hidden = true;
-  panel.innerHTML = "";
-}
-
-function toggleDirection(slug, { updateHash = true } = {}) {
+function openCategoryDialog(slug, { updateHash = true, trigger = null } = {}) {
   const route = parseRoute();
   const carId = route.id;
   if (!carId || !slug) return;
-  const next = toggleOpenDir(openDirs, slug);
-  openDirs.clear();
-  next.forEach((item) => openDirs.add(item));
-  const open = openDirs.has(slug);
-  syncDirButton(slug, open);
-  if (open) expandDirectionPanel(carId, slug);
-  else collapseDirectionPanel(carId, slug);
+  const carState = state.cars[carId];
+  if (!carState) return;
+  if (!visibleDirections(carState).some((item) => item.slug === slug)) return;
+  if (sheetDir && sheetDir !== slug) revokeFolderObjectUrls(carId, sheetDir);
+  sheetDir = slug;
+  sheetNode = null;
+  sheetPane = "checks";
+  lastDirTrigger = trigger || document.querySelector(`.dir-btn[data-select-dir="${slug}"]`);
+  const dialog = document.getElementById("categoryDialog");
+  if (!dialog) return;
+  fillSheet(carId, slug);
+  if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
+  syncDirButtons(slug);
   if (updateHash && isCarRoute(route)) {
-    const nextHash = canonicalHash({ name: "car", id: carId, dir: hashDirFromOpen(openDirs, slug) });
+    const nextHash = canonicalHash({ name: "car", id: carId, dir: slug });
     if (location.hash !== nextHash) history.replaceState(null, "", nextHash);
   }
 }
 
-function bindPicker() {
-  document.querySelectorAll("[data-select-dir]").forEach((button) => {
-    button.addEventListener("click", () => {
-      toggleDirection(button.getAttribute("data-select-dir"));
-    });
-  });
+function onSheetClose() {
+  const route = parseRoute();
+  const carId = route.id;
+  if (carId && sheetDir) revokeFolderObjectUrls(carId, sheetDir);
+  sheetDir = null;
+  sheetNode = null;
+  sheetPane = "checks";
+  syncDirButtons(null);
+  if (carId && isCarRoute(route)) {
+    const nextHash = canonicalHash({ name: "car", id: carId, dir: null });
+    if (location.hash !== nextHash) history.replaceState(null, "", nextHash);
+  }
+  if (lastDirTrigger && document.contains(lastDirTrigger)) lastDirTrigger.focus();
 }
 
-function bindDirJump() {
-  document.querySelectorAll("[data-jump-dir]").forEach((button) => {
+function bindSheetDialog() {
+  const dialog = document.getElementById("categoryDialog");
+  if (!dialog) return;
+  dialog.addEventListener("close", onSheetClose);
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.querySelectorAll("[data-close-sheet]").forEach((button) => {
+    button.addEventListener("click", () => dialog.close());
+  });
+  document.querySelectorAll("[data-select-dir]").forEach((button) => {
     button.addEventListener("click", () => {
-      const slug = button.getAttribute("data-jump-dir");
-      if (slug && !openDirs.has(slug)) toggleDirection(slug);
-      document.querySelector(`[data-direction-item="${slug}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      openCategoryDialog(button.getAttribute("data-select-dir"), { trigger: button });
     });
   });
 }
 
 async function hydrateMedia(carId, slug, root = document) {
-  const folder = root.querySelector("[data-media-folder]");
+  const folder = root.matches?.("[data-media-folder]") ? root : root.querySelector("[data-media-folder]");
   if (!folder) return;
   const status = folder.querySelector("[data-media-status]");
-  const activeTab = folder.querySelector('[data-media-tab][aria-selected="true"]')?.getAttribute("data-media-tab") || "photo";
   try {
     const items = await listFolderMedia(carId, slug);
     const photos = items.filter((item) => item.kind === "photo");
     const videos = items.filter((item) => item.kind === "video");
-    const photoCount = folder.querySelector("[data-photo-count]");
-    const videoCount = folder.querySelector("[data-video-count]");
-    if (photoCount) photoCount.textContent = String(photos.length);
-    if (videoCount) videoCount.textContent = String(videos.length);
+    const countRoot = folder.closest("dialog") || folder;
+    countRoot.querySelectorAll("[data-photo-count]").forEach((el) => {
+      el.textContent = String(photos.length);
+    });
+    countRoot.querySelectorAll("[data-video-count]").forEach((el) => {
+      el.textContent = String(videos.length);
+    });
     const photoBox = folder.querySelector("[data-photo-gallery]");
     if (photoBox) {
       photoBox.innerHTML = photos.length
@@ -773,8 +875,14 @@ async function hydrateMedia(carId, slug, root = document) {
             .join("")
         : `<p class="empty-media">${emptyVideoText()}</p>`;
     }
-    folder.querySelector("[data-photo-panel]").hidden = activeTab !== "photo";
-    folder.querySelector("[data-video-panel]").hidden = activeTab !== "video";
+    const tab = folder.querySelector('[data-media-tab][aria-selected="true"]');
+    if (tab) {
+      const name = tab.getAttribute("data-media-tab");
+      const photoPanel = folder.querySelector("[data-photo-panel]");
+      const videoPanel = folder.querySelector("[data-video-panel]");
+      if (photoPanel) photoPanel.hidden = name !== "photo";
+      if (videoPanel) videoPanel.hidden = name !== "video";
+    }
     if (status) {
       status.textContent = "";
       status.removeAttribute("aria-busy");
@@ -790,17 +898,6 @@ function bindMediaSection(root = document) {
   for (const folder of folders) {
     if (folder.dataset.mediaBound === "1") continue;
     folder.dataset.mediaBound = "1";
-    folder.addEventListener("click", (event) => {
-      const tab = event.target.closest("[data-media-tab]");
-      if (tab && folder.contains(tab)) {
-        const name = tab.getAttribute("data-media-tab");
-        folder.querySelectorAll("[data-media-tab]").forEach((button) => {
-          button.setAttribute("aria-selected", button === tab ? "true" : "false");
-        });
-        folder.querySelector("[data-photo-panel]").hidden = name !== "photo";
-        folder.querySelector("[data-video-panel]").hidden = name !== "video";
-      }
-    });
     folder.addEventListener("change", async (event) => {
       const input = event.target.closest("[data-media-upload]");
       if (!input) return;
@@ -822,7 +919,7 @@ function bindMediaSection(root = document) {
         }
         if (status) status.textContent = `«${file.name}» сохранён в папке этого автомобиля в этом браузере.`;
       }
-      await hydrateMedia(carId, slug, folder.closest("[data-dir-panel]") || folder);
+      await hydrateMedia(carId, slug, folder);
     });
     folder.addEventListener("click", async (event) => {
       const del = event.target.closest("[data-del-media]");
@@ -832,7 +929,7 @@ function bindMediaSection(root = document) {
         const result = await deleteFolderMedia(del.getAttribute("data-del-media"), carId, slug);
         const status = folder.querySelector("[data-media-status]");
         if (!result.ok && status) status.textContent = result.error;
-        await hydrateMedia(carId, slug, folder.closest("[data-dir-panel]") || folder);
+        await hydrateMedia(carId, slug, folder);
         return;
       }
       const view = event.target.closest("[data-view-photo]");
@@ -872,8 +969,11 @@ function bindFieldRoot(root) {
       if (carState.status === "created" || carState.status === "published") {
         if (carState.status !== "published") carState.status = "in_progress";
       }
-      const head = document.querySelector(`[data-node="${nodeFolderKey(carId, dir, cp)}"] .node-score`);
-      if (head && act === "score") head.textContent = nodeScoreLabel(result.score);
+      if (act === "score") {
+        document.querySelectorAll(`[data-node-score="${cp}"]`).forEach((head) => {
+          head.textContent = nodeScoreLabel(result.score);
+        });
+      }
       scheduleSave();
       patchLiveSummaries(carId);
     };
@@ -902,12 +1002,140 @@ function bindFieldRoot(root) {
   });
 }
 
+
+let deferredInstallPrompt = null;
+
+function isStandaloneDisplay() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function isIosDevice() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function showActionStatus(message) {
+  const el = document.getElementById("actionStatus");
+  if (!el) return;
+  el.hidden = !message;
+  el.textContent = message || "";
+}
+
+function sharePayload() {
+  const route = parseRoute();
+  if (isCarRoute(route) && route.id && carMeta(route.id)) {
+    const car = carMeta(route.id);
+    return {
+      title: `${car.make} ${car.model}, ${car.year} — АвтоМастер24`,
+      text: `Оценочный лист: ${car.make} ${car.model}, ${car.year}`,
+      url: buildPublicCarUrl(siteBase(), route.id),
+    };
+  }
+  return {
+    title: "АвтоМастер24 / Трейд-ин",
+    text: "Учебный предпросмотр независимого осмотра автомобиля.",
+    url: siteBase(),
+  };
+}
+
+async function copyShareUrl(url) {
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+    throw new Error("clipboard unavailable");
+  }
+  await navigator.clipboard.writeText(url);
+  showActionStatus("Ссылка скопирована");
+}
+
+async function sharePage() {
+  const payload = sharePayload();
+  showActionStatus("");
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share(payload);
+      return;
+    } catch (error) {
+      if (error && error.name === "AbortError") return;
+    }
+  }
+  try {
+    await copyShareUrl(payload.url);
+  } catch {
+    const help = document.getElementById("copyHelp");
+    const box = document.getElementById("copyFallback");
+    if (box) box.value = payload.url;
+    if (help && typeof help.showModal === "function") help.showModal();
+  }
+}
+
+function refreshInstallButton() {
+  const button = document.getElementById("installApp");
+  if (!button) return;
+  if (isStandaloneDisplay()) {
+    button.textContent = "Открыто с домашнего экрана";
+    button.disabled = true;
+    return;
+  }
+  button.disabled = false;
+  button.textContent = "Установить на телефон";
+}
+
+async function installApp() {
+  showActionStatus("");
+  if (isStandaloneDisplay()) {
+    showActionStatus("Сайт уже открыт как ярлык на устройстве.");
+    return;
+  }
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    if (choice && choice.outcome === "accepted") {
+      showActionStatus("Ярлык добавляется на устройство. Это не установка из магазина приложений.");
+      refreshInstallButton();
+    }
+    return;
+  }
+  if (isIosDevice()) {
+    document.getElementById("iosInstallHelp")?.showModal();
+    return;
+  }
+  showActionStatus("В этом браузере установка ярлыка сейчас недоступна. На поддерживаемом телефоне появится запрос системы, либо добавьте страницу в закладки. Это не приложение из магазина, аккаунт не создаётся, данные остаются только в этом браузере.");
+}
+
+function registerShellWorker() {
+  if (!ASSET_VERSION || !("serviceWorker" in navigator)) return;
+  const workerUrl = new URL("sw.js", siteBase()).href;
+  navigator.serviceWorker.register(workerUrl, { scope: new URL("./", siteBase()).pathname }).catch(() => {});
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    refreshInstallButton();
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    refreshInstallButton();
+  });
+}
+
 function bind() {
-  bindDisclosure();
-  bindPicker();
-  bindDirJump();
+  bindSheetDialog();
   bindFieldRoot(document);
   bindMediaSection(document);
+  document.getElementById("sharePage")?.addEventListener("click", () => {
+    sharePage();
+  });
+  document.getElementById("installApp")?.addEventListener("click", () => {
+    installApp();
+  });
+  document.getElementById("iosInstallClose")?.addEventListener("click", () => {
+    document.getElementById("iosInstallHelp")?.close();
+  });
+  document.getElementById("copyHelpClose")?.addEventListener("click", () => {
+    document.getElementById("copyHelp")?.close();
+  });
+  refreshInstallButton();
   document.getElementById("modeToggle")?.addEventListener("click", () => {
     document.getElementById("modeDialog")?.showModal();
   });
@@ -976,5 +1204,6 @@ function bind() {
   });
 }
 
+registerShellWorker();
 window.addEventListener("hashchange", render);
 render();
