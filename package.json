@@ -1,0 +1,11 @@
+{
+  "name": "auto-inspection-preview",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Статическое демо осмотра авто АвтоМастер24 / Трейд-ин. Без сервера и авторизации.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/demo.test.mjs",
+    "check": "node --check js/scoring.js && node --check js/whatsapp.js && node --check js/storage.js && node --check js/data.js && node --check js/app.js && node --check tests/demo.test.mjs"
+  }
+}
