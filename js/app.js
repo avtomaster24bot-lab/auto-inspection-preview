@@ -642,8 +642,8 @@ function renderCar(id, route = parseRoute()) {
       ${unpublished ? "" : `<p class="formula">${FORMULA_DISCLAIMER}</p>`}
       ${highlightsHTML(id)}
       ${conditionLegend()}
-      <h2>Разделы диагностики</h2>
-      <p class="lead">Выберите раздел. Семь отдельных кнопок: сначала ходовая часть, затем кузов, двигатель, электрика и остальные разделы. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>
+      <h2>Выберите раздел</h2>
+      <p class="lead">Нажмите кнопку — откроется окно с проверками, фото и видео.</p>
       ${masterFilterNote()}
       ${directionButtonsHTML(id, dirs)}
       ${finalVerdictHTML(id)}
