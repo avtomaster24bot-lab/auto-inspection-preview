@@ -1,4 +1,4 @@
-import { folderKey } from "./folder.js?v=20261108f";
+import { folderKey } from "./folder.js?v=20261108g";
 
 export const MEDIA_DB_NAME = "am24-tradein-demo-media-v1";
 export const MEDIA_STORE = "media";

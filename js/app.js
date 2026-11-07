@@ -1,13 +1,13 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108f";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108f";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108f";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108f";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108f";
-import { directionThumb } from "./icons.js?v=20261108f";
-import { folderKey } from "./folder.js?v=20261108f";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108f";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108f";
-import { carTopSvg, carSideSvg } from "./scheme.js?v=20261108f";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108g";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108g";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108g";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108g";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108g";
+import { directionThumb } from "./icons.js?v=20261108g";
+import { folderKey } from "./folder.js?v=20261108g";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108g";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108g";
+import { carTopSvg, carSideSvg } from "./scheme.js?v=20261108g";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -17,8 +17,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108f";
-import { ASSET_VERSION } from "./version.js?v=20261108f";
+} from "./media.js?v=20261108g";
+import { ASSET_VERSION } from "./version.js?v=20261108g";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -643,7 +643,7 @@ function renderCar(id, route = parseRoute()) {
       ${highlightsHTML(id)}
       ${conditionLegend()}
       <h2>Выберите раздел</h2>
-      <p class="lead">Разделы диагностики: семь отдельных кнопок — сначала ходовая часть, затем кузов, двигатель, электрика и остальные. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>
+      <p class="lead">Выберите раздел, чтобы посмотреть оценки, замечания и фото.</p>
       ${masterFilterNote()}
       ${directionButtonsHTML(id, dirs)}
       ${finalVerdictHTML(id)}
@@ -1207,20 +1207,6 @@ if (typeof window !== "undefined") {
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     refreshInstallButton();
-  });
-}
-
-function bindSchemeTabs() {
-  const tabs = [...document.querySelectorAll("[data-scheme-view]")];
-  if (!tabs.length) return;
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const name = tab.getAttribute("data-scheme-view");
-      tabs.forEach((item) => item.setAttribute("aria-selected", item === tab ? "true" : "false"));
-      document.querySelectorAll("[data-scheme-panel]").forEach((panel) => {
-        panel.classList.toggle("is-active", panel.getAttribute("data-scheme-panel") === name);
-      });
-    });
   });
 }
 

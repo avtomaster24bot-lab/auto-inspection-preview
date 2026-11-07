@@ -582,12 +582,37 @@ test("scheme shows recognizable top and side car views", () => {
   assert.match(app, /scheme-view-title">Вид сбоку/);
 });
 
+test("mobile scheme stays stacked and visible without leftover tab-hide rules", () => {
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(css, /\.scheme-panel\s*\{[^}]*display:\s*block/s);
+  assert.match(css, /\.scheme-svg\s*\{[^}]*width:\s*100%/s);
+  assert.match(css, /\.scheme-svg\s*\{[^}]*height:\s*auto/s);
+  assert.match(css, /\.scheme-svg\s*\{[^}]*min-height:\s*148px/s);
+  assert.match(css, /aspect-ratio:\s*760 \/ 360/);
+  assert.match(css, /aspect-ratio:\s*760 \/ 300/);
+  assert.equal(css.includes(".scheme-panel { display: none; }"), false);
+  assert.equal(css.includes(".scheme-panel.is-active"), false);
+  assert.equal(/@media \(max-width: 719px\)[\s\S]*?\.scheme-panel\s*\{\s*display:\s*none/.test(css), false);
+  assert.equal(css.includes("scheme-tabs { display: none; }"), false);
+  assert.match(app, /scheme-view-title">Вид сверху/);
+  assert.match(app, /scheme-view-title">Вид сбоку/);
+  assert.equal(app.includes("data-scheme-view"), false);
+  assert.equal(app.includes("function bindSchemeTabs"), false);
+  assert.match(app, /Выберите раздел, чтобы посмотреть оценки, замечания и фото/);
+  assert.equal(app.includes("простыни"), false);
+  assert.equal(app.includes("семь отдельных кнопок"), false);
+  assert.match(css, /\.top \.btn\.ghost\.header-action/);
+  assert.match(css, /\.top \.btn\.ghost\.header-action[^{]*\{[^}]*background:\s*#ffffff/s);
+  assert.match(css, /\.top \.btn\.ghost\.header-action[^{]*\{[^}]*color:\s*#0b1f33/s);
+});
+
 test("service worker prefers the network so a refresh gets the latest shell", () => {
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108f/);
-  assert.match(sw, /scheme\.js\?v=20261108f/);
+  assert.match(sw, /access\.js\?v=20261108g/);
+  assert.match(sw, /scheme\.js\?v=20261108g/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");

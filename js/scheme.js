@@ -30,7 +30,7 @@ export function carTopSvg({ zoneClassMap = {}, geometryCritical = false } = {}) 
   const crit = geometryCritical
     ? criticalMark(320, 180, "Есть критичное замечание в геометрии / лонжеронах")
     : "";
-  return `<svg class="scheme-svg scheme-top" viewBox="0 0 760 360" role="img" aria-label="Вид автомобиля сверху: капот, салон, багажник и колёса">
+  return `<svg class="scheme-svg scheme-top" viewBox="0 0 760 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Вид автомобиля сверху: капот, салон, багажник и колёса">
     <defs>
       <linearGradient id="top-body" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#dce5ee"/>
@@ -93,7 +93,7 @@ export function carSideSvg({ zoneClassMap = {}, geometryCritical = false } = {})
   const crit = geometryCritical
     ? criticalMark(360, 214, "Есть критичное замечание в геометрии / лонжеронах")
     : "";
-  return `<svg class="scheme-svg scheme-side" viewBox="0 0 760 300" role="img" aria-label="Вид автомобиля сбоку: крыша, окна, двери, арки и колёса">
+  return `<svg class="scheme-svg scheme-side" viewBox="0 0 760 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Вид автомобиля сбоку: крыша, окна, двери, арки и колёса">
     <defs>
       <linearGradient id="side-body" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#e8eef4"/>
