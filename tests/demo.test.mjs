@@ -401,14 +401,15 @@ test("share falls back without claiming success and install uses a real manifest
   assert.equal(existsSync(new URL("../images/apple-touch-icon.png", import.meta.url)), true);
 });
 
-test("public preview uses Авто Лидер brand and tomography tagline once per sheet", () => {
+test("public preview uses Авто Лидер brand and clarity slogan without tomography", () => {
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
   assert.match(app, /const BRAND_NAME = "Авто Лидер"/);
   assert.match(app, /const BRAND_SUBLINE = "Проверенные авто!"/);
   assert.match(app, /const BRAND_FULL = "Авто Лидер — Проверенные авто!"/);
-  assert.match(app, /const BRAND_TAGLINE = "Томография автомобиля"/);
+  assert.match(app, /const BRAND_TAGLINE = "Состояние авто — без тёмных пятен"/);
+  assert.match(app, /const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь."/);
   assert.match(app, /class="logo">\$\{BRAND_NAME\}/);
   assert.match(app, /class="brand-sub">\$\{BRAND_SUBLINE\}/);
   assert.match(app, /class="lead motto">\$\{BRAND_TAGLINE\}/);
@@ -418,10 +419,15 @@ test("public preview uses Авто Лидер brand and tomography tagline once 
   assert.match(html, /apple-mobile-web-app-title" content="Авто Лидер"/);
   assert.match(css, /\.brand-sub/);
   assert.match(css, /\.motto/);
+  assert.match(css, /\.support/);
   const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function unpublishedBlock"));
   const car = app.slice(app.indexOf("function renderCar"), app.indexOf("function renderAdmin"));
   assert.match(home, /BRAND_TAGLINE/);
+  assert.match(home, /BRAND_SUPPORT/);
   assert.match(car, /BRAND_TAGLINE/);
+  assert.equal(car.includes("BRAND_SUPPORT"), false);
   const buttons = app.slice(app.indexOf("function directionButtonsHTML"), app.indexOf("function masterFilterNote"));
   assert.equal(buttons.includes("BRAND_TAGLINE"), false);
+  assert.equal(app.toLowerCase().includes("томограф"), false);
+  assert.equal(html.toLowerCase().includes("томограф"), false);
 });

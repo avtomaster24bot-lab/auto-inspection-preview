@@ -1,11 +1,11 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108d";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108d";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108d";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108d";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108d";
-import { directionThumb } from "./icons.js?v=20261108d";
-import { folderKey } from "./folder.js?v=20261108d";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108d";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108e";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108e";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108e";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108e";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108e";
+import { directionThumb } from "./icons.js?v=20261108e";
+import { folderKey } from "./folder.js?v=20261108e";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108e";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -15,8 +15,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108d";
-import { ASSET_VERSION } from "./version.js?v=20261108d";
+} from "./media.js?v=20261108e";
+import { ASSET_VERSION } from "./version.js?v=20261108e";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -28,7 +28,8 @@ const STATUS_LABEL = {
 const BRAND_NAME = "Авто Лидер";
 const BRAND_SUBLINE = "Проверенные авто!";
 const BRAND_FULL = "Авто Лидер — Проверенные авто!";
-const BRAND_TAGLINE = "Томография автомобиля";
+const BRAND_TAGLINE = "Состояние авто — без тёмных пятен";
+const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь.";
 
 const MASTER_FILTER_NOTE =
   "В режиме мастера — только назначенные разделы; посмотреть все в режиме покупателя (опубликованный отчёт)/администратора";
@@ -540,7 +541,7 @@ function renderHome() {
     <main class="wrap">
       <h1>Выберите автомобиль</h1>
       <p class="lead motto">${BRAND_TAGLINE}</p>
-      <p class="lead">Сначала выберите машину. Оценки, фото и видео откроются в её оценочном листе.</p>
+      <p class="support">${BRAND_SUPPORT}</p>
       <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
     </main>`;
 }
