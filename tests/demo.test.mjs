@@ -170,12 +170,76 @@ test("folder keys keep cars and directions apart", () => {
   assert.equal(folderKey("primer-sedan", "hodovaya"), "primer-sedan/hodovaya");
   assert.notEqual(folderKey("primer-sedan", "hodovaya"), folderKey("primer-universal", "hodovaya"));
   assert.notEqual(folderKey("primer-sedan", "hodovaya"), folderKey("primer-sedan", "engine"));
-  assert.equal(nodeFolderKey("primer-sedan", "hodovaya", "amort-front"), "primer-sedan/hodovaya/amort-front");
-  assert.deepEqual(parseFolderKey("primer-sedan/hodovaya/amort-front"), {
+  assert.equal(nodeFolderKey("primer-sedan", "hodovaya", "amort-rear"), "primer-sedan/hodovaya/amort-rear");
+  assert.deepEqual(parseFolderKey("primer-sedan/hodovaya/amort-rear"), {
     carId: "primer-sedan",
     directionId: "hodovaya",
-    checkpointId: "amort-front",
+    checkpointId: "amort-rear",
   });
   assert.throws(() => folderKey("", "hodovaya"));
   assert.throws(() => folderKey("primer-sedan", ""));
+});
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { ensureCarShape } from "../js/data.js";
+import { validateMediaFile, mediaRecordId, mimeToKind, MEDIA_POLICY, isQuotaError } from "../js/media.js";
+
+test("catalog home markup does not embed seven direction tiles", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const card = app.slice(app.indexOf("function carCard"), app.indexOf("function renderHome"));
+  const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function renderCar"));
+  assert.match(card, /Открыть папку/);
+  assert.match(card, /overallHero/);
+  assert.equal(card.includes("conditionGrid"), false);
+  assert.equal(card.includes("directionPicker"), false);
+  assert.equal(home.includes("conditionGrid"), false);
+  assert.equal(home.includes("directionPicker"), false);
+  assert.match(app, /function renderCar/);
+  assert.match(app, /Оценочный лист/);
+  assert.match(app, />Фото </);
+  assert.match(app, />Видео </);
+  assert.match(app, /Пока нет фотографий в этой папке/);
+  assert.match(app, /Пока нет видео в этой папке/);
+});
+
+test("media validation rejects wrong type, size and folder counts", () => {
+  assert.equal(mimeToKind("image/jpeg"), "photo");
+  assert.equal(mimeToKind("video/mp4"), "video");
+  assert.equal(mimeToKind("application/pdf"), null);
+  assert.equal(validateMediaFile({ mime: "image/gif", sizeBytes: 100 }).ok, false);
+  assert.equal(validateMediaFile({ mime: "image/jpeg", sizeBytes: MEDIA_POLICY.maxPhotoBytes + 1 }).ok, false);
+  assert.equal(validateMediaFile({ mime: "video/mp4", sizeBytes: MEDIA_POLICY.maxVideoBytes + 1 }).ok, false);
+  assert.equal(validateMediaFile({ mime: "image/jpeg", sizeBytes: 100, existingPhotos: MEDIA_POLICY.maxPhotosPerFolder }).ok, false);
+  assert.equal(validateMediaFile({ mime: "video/webm", sizeBytes: 100, existingVideos: MEDIA_POLICY.maxVideosPerFolder }).ok, false);
+  assert.equal(validateMediaFile({ mime: "image/jpeg", sizeBytes: 100, kind: "video" }).ok, false);
+  assert.equal(validateMediaFile({ mime: "video/mp4", sizeBytes: 100, kind: "photo" }).ok, false);
+  assert.equal(validateMediaFile({ mime: "image/png", sizeBytes: 100 }).ok, true);
+  assert.equal(validateMediaFile({ mime: "image/webp", sizeBytes: 2048 }).ok, true);
+  assert.equal(validateMediaFile({ mime: "video/quicktime", sizeBytes: 100 }).ok, true);
+});
+
+test("media record ids stay inside one car and direction", () => {
+  const a = mediaRecordId("primer-sedan", "hodovaya", "file-1");
+  const b = mediaRecordId("primer-universal", "hodovaya", "file-1");
+  const c = mediaRecordId("primer-sedan", "engine", "file-1");
+  assert.equal(a, "primer-sedan/hodovaya/file-1");
+  assert.notEqual(a, b);
+  assert.notEqual(a, c);
+  assert.equal(a.startsWith("primer-sedan/hodovaya/"), true);
+  assert.equal(isQuotaError({ name: "QuotaExceededError" }), true);
+  assert.equal(isQuotaError({ code: 22 }), true);
+  assert.equal(isQuotaError({ name: "Error" }), false);
+});
+
+test("ensureCarShape adds direction notes without wiping scores", () => {
+  const state = createDefaultState();
+  const originalComment = state.cars["primer-sedan"].results.hodovaya["amort-rear"].publicComment;
+  const stripped = { ...state.cars["primer-sedan"] };
+  delete stripped.directionNotes;
+  const next = ensureCarShape(stripped);
+  assert.equal(next.directionNotes.hodovaya.publicComment, "");
+  assert.equal(next.directionNotes.engine.internalComment, "");
+  assert.equal(next.results.hodovaya["amort-rear"].publicComment, originalComment);
+  assert.notEqual(originalComment, "");
 });

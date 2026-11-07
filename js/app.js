@@ -1,10 +1,20 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar } from "./data.js";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape } from "./data.js";
 import { FORMULA_DISCLAIMER } from "./scoring.js";
 import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js";
 import { loadState, saveState, clearState } from "./storage.js";
 import { summarizeDirection, summarizeOverall, directionTitle } from "./summary.js";
 import { directionIcon } from "./icons.js";
 import { folderKey, nodeFolderKey } from "./folder.js";
+import {
+  MEDIA_LIMITS_TEXT,
+  addFolderMedia,
+  clearAllMedia,
+  deleteFolderMedia,
+  listFolderMedia,
+  objectUrlFor,
+  revokeAllObjectUrls,
+  revokeFolderObjectUrls,
+} from "./media.js";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -15,7 +25,6 @@ const STATUS_LABEL = {
 
 const openDirs = new Set();
 const openNodes = new Set();
-const localFolderFiles = new Map();
 let printOpened = [];
 
 let state = hydrate();
@@ -24,11 +33,16 @@ let saveTimer = 0;
 function hydrate() {
   const saved = loadState();
   const fresh = createDefaultState();
-  if (!saved || saved.version !== 1 || !saved.cars) return fresh;
+  if (!saved || saved.version !== 1 || !saved.cars) {
+    Object.values(fresh.cars).forEach(ensureCarShape);
+    return fresh;
+  }
+  const cars = { ...fresh.cars, ...saved.cars };
+  for (const id of Object.keys(cars)) ensureCarShape(cars[id]);
   return {
     ...fresh,
     ...saved,
-    cars: { ...fresh.cars, ...saved.cars },
+    cars,
   };
 }
 
@@ -295,8 +309,8 @@ function actionRow(car) {
   const carState = state.cars[car.id];
   const reportVisible = carState.status === "published" || state.role !== "buyer";
   const reportLink = reportVisible
-    ? `<a class="btn" href="#/report/${car.id}">Смотреть отчёт</a>`
-    : `<span class="hint">Публичный отчёт появится после публикации.</span>`;
+    ? `<a class="btn" href="#/report/${car.id}">Оценочный лист</a>`
+    : `<span class="hint">Оценочный лист появится после публикации.</span>`;
   const fillLink = canEdit()
     ? `<a class="btn ghost" href="#/inspect/${car.id}">Заполнить чек-лист</a>`
     : `<span class="hint">Для заполнения выберите режим Мастер/Администратор</span>`;
@@ -313,12 +327,9 @@ function carCard(car) {
     <p class="status">${STATUS_LABEL[carState.status]}</p>
     ${overallHero(car.id)}
     <p>${car.summary}</p>
-    <p class="hint">Папка автомобиля: сведения, акт оценки и папки диагностики только этого авто. Это папка внутри сайта, не на диске компьютера.</p>
     <div class="row">
       <a class="btn" href="#/c/${car.id}">Открыть папку</a>
     </div>
-    ${actionRow(car)}
-    ${conditionGrid(car.id)}
     ${renderWhatsApp(car)}
   </article>`;
 }
@@ -327,22 +338,26 @@ function renderHome() {
   return `${header()}
     <main class="wrap">
       <h1>Каталог учебных автомобилей</h1>
-      <p class="lead">Каждый автомобиль лежит в своей папке: сведения об авто, акт оценки и отдельные папки направлений. Нажмите «Открыть папку». Данные разных машин не смешиваются.</p>
+      <p class="lead">Сначала выберите автомобиль и нажмите «Открыть папку». Внутри папки — сведения об авто, оценочный лист и папки направлений с описанием, фото и видео. Данные разных машин не смешиваются.</p>
       ${fillHint()}
       <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
     </main>`;
 }
 
-function renderCar(id) {
+function renderCar(id, route = parseRoute()) {
   const car = carMeta(id);
   const carState = state.cars[id];
   if (!car || !carState) return `${header()}<main class="wrap"><h1>Образец не найден</h1></main>`;
+  const { scores, unpublished } = overviewFor(id);
+  const dirs = visibleDirections(carState);
+  const selected = route.dir && dirs.some((item) => item.slug === route.dir) ? route.dir : null;
+  if (selected) openDirs.add(selected);
   return `${header()}
     <main class="wrap">
       <a class="back" href="#/">Все автомобили</a>
       <p class="tag">Папка автомобиля · ${car.label}</p>
       <h1>Папка автомобиля: ${car.make} ${car.model}, ${car.year}</h1>
-      <p class="lead">Здесь только этот автомобиль — сведения, акт осмотра и папки диагностики. Описания и файлы другого авто сюда не попадают. Это папка внутри сайта, не на диске компьютера.</p>
+      <p class="lead">Здесь только этот автомобиль — сведения, оценочный лист и папки диагностики с описанием, фото и видео. Файлы другого авто сюда не попадают. Это папка внутри сайта, не на диске компьютера.</p>
       ${carSvg()}
       <dl class="facts">
         <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
@@ -352,9 +367,12 @@ function renderCar(id) {
         <div><dt>Статус осмотра</dt><dd>${STATUS_LABEL[carState.status]}</dd></div>
       </dl>
       ${overallHero(id)}
+      <div class="assessment-entry">${actionRow(car)}</div>
       ${fillHint()}
-      ${actionRow(car)}
-      ${conditionGrid(id)}
+      ${conditionLegend()}
+      <h2>Папки направлений</h2>
+      <p class="lead">Нажмите картинку направления, чтобы открыть описание, фото и видео этой категории.</p>
+      ${directionPicker(id, dirs, scores, unpublished, selected, "folder")}
       ${renderWhatsApp(car)}
     </main>`;
 }
@@ -419,19 +437,61 @@ function pickerCard(direction, summary, selected) {
   </button>`;
 }
 
-function folderFilesHTML(carId, slug) {
+function directionNotesHTML(carId, slug, editable) {
+  ensureCarShape(state.cars[carId]);
+  const notes = state.cars[carId].directionNotes[slug];
+  if (editable) {
+    return `<section class="dir-notes">
+      <label>Описание направления
+        <textarea data-dir-note="publicComment" data-car="${carId}" data-dir="${slug}">${escapeHtml(notes.publicComment)}</textarea>
+      </label>
+      ${
+        canSeeInternal()
+          ? `<label>Внутренний комментарий направления (скрыт от покупателя)
+        <textarea data-dir-note="internalComment" data-car="${carId}" data-dir="${slug}">${escapeHtml(notes.internalComment)}</textarea>
+      </label>`
+          : ""
+      }
+    </section>`;
+  }
+  return `<section class="dir-notes">
+    <h3>Описание</h3>
+    <p>${notes.publicComment ? escapeHtml(notes.publicComment) : "Описание направления пока не заполнено."}</p>
+    ${canSeeInternal() && notes.internalComment ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(notes.internalComment)}</div>` : ""}
+  </section>`;
+}
+
+function mediaSectionsHTML(carId, slug, editable) {
   const key = folderKey(carId, slug);
-  const stored = localFolderFiles.get(key);
-  const car = carMeta(carId);
-  const title = directionTitle(slug);
-  const preview = stored
-    ? `<img alt="Локальный предпросмотр файла этой папки" src="${stored.url}"><p class="hint">«${escapeHtml(stored.name)}» относится только к «${escapeHtml(car ? `${car.make} ${car.model}` : carId)}» / «${escapeHtml(title)}». Файл не отправлен на сервер.</p>`
-    : "";
-  return `<section class="folder-files card">
-    <h3>Файлы папки «${escapeHtml(title)}»</h3>
-    <p class="hint">Просмотр только в этом браузере и только в папке этого автомобиля и этого направления. Файл не загружается на сервер и не появится у другой машины. Это папка внутри сайта, не на диске компьютера. Отдельного видеоотчёта в демо нет.</p>
-    <input type="file" data-folder-file="${escapeHtml(key)}" accept="image/*">
-    <div data-folder-preview="${escapeHtml(key)}" class="local-preview" ${stored ? "" : "hidden"}>${preview}</div>
+  return `<section class="media-folders" data-media-folder="${escapeHtml(key)}" data-car="${carId}" data-dir="${slug}">
+    <div class="media-block">
+      <h3>Фото <span data-photo-count>(0)</span></h3>
+      <div class="photo-gallery" data-photo-gallery><p class="empty-media">Пока нет фотографий в этой папке.</p></div>
+      ${
+        editable
+          ? `<label class="btn ghost file-btn">Добавить фото
+        <input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" data-media-upload="photo" data-car="${carId}" data-dir="${slug}">
+      </label>`
+          : ""
+      }
+    </div>
+    <div class="media-block">
+      <h3>Видео <span data-video-count>(0)</span></h3>
+      <div class="video-gallery" data-video-gallery><p class="empty-media">Пока нет видео в этой папке.</p></div>
+      ${
+        editable
+          ? `<label class="btn ghost file-btn">Добавить видео
+        <input type="file" hidden multiple accept="video/mp4,video/webm,video/quicktime" data-media-upload="video" data-car="${carId}" data-dir="${slug}">
+      </label>`
+          : ""
+      }
+    </div>
+    <p class="hint">${MEDIA_LIMITS_TEXT} Это не настоящая система прав доступа: файлы видит этот браузер.</p>
+    <p class="hint" data-media-status role="status"></p>
+    <dialog class="photo-viewer" data-photo-viewer>
+      <img alt="Просмотр фото">
+      <form method="dialog"><button class="btn" value="close">Закрыть</button></form>
+    </dialog>
   </section>`;
 }
 
@@ -446,9 +506,10 @@ function inspectPanelHTML(carId, slug) {
   const car = carMeta(carId);
   return `<h3>Папка направления: ${directionTitle(slug, direction.name)}</h3>
     <p class="hint">Эта папка принадлежит автомобилю «${car ? `${car.make} ${car.model}` : carId}» и не смешивается с другими машинами. Назначение: ${DEMO_MASTERS.find((item) => item.id === assignment?.masterId)?.name || "не назначен"} · статус ${assignment?.status || "pending"}</p>
+    ${directionNotesHTML(carId, slug, true)}
+    ${mediaSectionsHTML(carId, slug, true)}
     ${nodes}
-    ${state.role === "master" ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}
-    ${folderFilesHTML(carId, slug)}`;
+    ${state.role === "master" ? `<button type="button" class="btn" data-submit="${slug}">Отправить направление на проверку</button>` : ""}`;
 }
 
 function reportPanelHTML(carId, slug) {
@@ -461,7 +522,29 @@ function reportPanelHTML(carId, slug) {
   const car = carMeta(carId);
   return `<h3>Папка направления: ${directionTitle(slug, direction.name)}</h3>
     <p class="hint">Оценки узлов только автомобиля «${car ? `${car.make} ${car.model}` : carId}». Описания другого авто здесь не показываются.</p>
+    ${directionNotesHTML(carId, slug, false)}
+    ${mediaSectionsHTML(carId, slug, false)}
     ${nodes}`;
+}
+
+function folderPanelHTML(carId, slug) {
+  const carState = state.cars[carId];
+  const car = carMeta(carId);
+  if (state.role === "buyer" && carState.status !== "published") {
+    return `<p>Отчёт ещё не опубликован. В режиме покупателя описание, фото и видео этой папки скрыты.</p>`;
+  }
+  const reportVisible = carState.status === "published" || state.role !== "buyer";
+  return `<h3>Папка направления: ${directionTitle(slug)}</h3>
+    <p class="hint">Эта папка принадлежит автомобилю «${car ? `${car.make} ${car.model}` : carId}» и не смешивается с другими машинами.</p>
+    ${directionNotesHTML(carId, slug, canEdit())}
+    ${mediaSectionsHTML(carId, slug, canEdit())}
+    ${
+      canEdit()
+        ? `<a class="btn ghost" href="#/inspect/${carId}/${slug}">Оценки узлов</a>`
+        : reportVisible
+          ? `<a class="btn ghost" href="#/report/${carId}/${slug}">Оценки узлов в оценочном листе</a>`
+          : ""
+    }`;
 }
 
 function printAllHTML(carId, dirs) {
@@ -478,7 +561,9 @@ function printAllHTML(carId, dirs) {
           return `<li>${checkpoint.name} — ${nodeScoreLabel(result.score)} — ${escapeHtml(result.versionNote || "—")}. ${escapeHtml(result.publicComment || "—")}${internal}</li>`;
         })
         .join("");
-      return `<section><h3>${directionTitle(direction.slug, direction.name)}</h3><ul>${items}</ul></section>`;
+      ensureCarShape(carState);
+      const note = carState.directionNotes[direction.slug]?.publicComment;
+      return `<section><h3>${directionTitle(direction.slug, direction.name)}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul></section>`;
     })
     .join("")}</div>`;
 }
@@ -495,9 +580,11 @@ function directionPicker(carId, dirs, scores, unpublished, selected, mode) {
   const panel =
     selected && mode === "inspect"
       ? inspectPanelHTML(carId, selected)
-      : selected
-        ? reportPanelHTML(carId, selected)
-        : "";
+      : selected && mode === "folder"
+        ? folderPanelHTML(carId, selected)
+        : selected
+          ? reportPanelHTML(carId, selected)
+          : "";
   return `<div class="dir-grid">${tiles}</div>
     <div id="dirExpand" class="dir-expand" data-panel-mode="${mode}" ${selected ? "" : "hidden"}>${panel || ""}</div>`;
 }
@@ -519,8 +606,7 @@ function renderInspect(id, route) {
         <a class="back" href="#/c/${car.id}">К папке автомобиля</a>
         <h1>Папка автомобиля: ${car.make} ${car.model}</h1>
         ${fillHint()}
-        ${conditionGrid(id)}
-        ${state.role !== "buyer" || carState.status === "published" ? `<p><a class="btn" href="#/report/${car.id}">Открыть отчёт с подробностями</a></p>` : ""}
+        ${state.role !== "buyer" || carState.status === "published" ? `<p><a class="btn" href="#/report/${car.id}">Оценочный лист</a></p>` : "<p>Оценочный лист появится после публикации.</p>"}
       </main>`;
   }
   const dirs = visibleDirections(carState);
@@ -537,7 +623,6 @@ function renderInspect(id, route) {
       <p class="hint">Автосохранение только в этом браузере. Нажмите картинку направления, затем нужный узел.</p>
       ${conditionLegend()}
       ${directionPicker(id, dirs, scores, false, selected, "inspect")}
-      <p class="hint">Файлы добавляются внутри выбранной папки направления и привязаны только к этому автомобилю.</p>
     </main>`;
 }
 
@@ -634,16 +719,19 @@ function escapeHtml(value) {
 }
 
 function render() {
+  revokeAllObjectUrls();
   const route = parseRoute();
   if (route.dir) openDirs.add(route.dir);
   let html = renderHome();
-  if (route.name === "car") html = renderCar(route.id);
+  if (route.name === "car") html = renderCar(route.id, route);
   if (route.name === "report") html = renderReport(route.id, route);
   if (route.name === "inspect") html = renderInspect(route.id, route);
   if (route.name === "admin") html = renderAdmin();
   document.getElementById("app").innerHTML = html;
   document.title = pageTitle(route);
   bind();
+  const panel = document.getElementById("dirExpand");
+  if (panel && route.dir && route.id) hydrateMedia(route.id, route.dir, panel);
 }
 
 function pageTitle(route) {
@@ -704,19 +792,38 @@ function applySelectedDirection(slug, { updateHash = true } = {}) {
   const panel = document.getElementById("dirExpand");
   if (panel) {
     if (!slug) {
+      const prevFolder = panel.getAttribute("data-open-folder");
+      if (prevFolder) {
+        const [cid, did] = prevFolder.split("/");
+        if (cid && did) revokeFolderObjectUrls(cid, did);
+      }
       panel.hidden = true;
       panel.innerHTML = "";
+      panel.removeAttribute("data-open-folder");
     } else {
+      const prevFolder = panel.getAttribute("data-open-folder");
+      if (prevFolder) {
+        const [cid, did] = prevFolder.split("/");
+        if (cid && did) revokeFolderObjectUrls(cid, did);
+      }
       const mode = panel.getAttribute("data-panel-mode") || route.name;
       panel.hidden = false;
-      panel.innerHTML = mode === "inspect" && canEdit() ? inspectPanelHTML(carId, slug) : reportPanelHTML(carId, slug);
+      panel.innerHTML =
+        mode === "inspect" && canEdit()
+          ? inspectPanelHTML(carId, slug)
+          : mode === "folder" || mode === "car"
+            ? folderPanelHTML(carId, slug)
+            : reportPanelHTML(carId, slug);
+      panel.setAttribute("data-open-folder", folderKey(carId, slug));
       bindFieldRoot(panel);
       bindDisclosure(panel);
-      bindFolderFiles(panel);
+      bindMediaSection(panel);
+      hydrateMedia(carId, slug, panel);
     }
   }
-  if (updateHash && (route.name === "report" || route.name === "inspect") && carId) {
-    const next = slug ? `#/${route.name}/${carId}/${slug}` : `#/${route.name}/${carId}`;
+  if (updateHash && carId && (route.name === "report" || route.name === "inspect" || route.name === "car")) {
+    const prefix = route.name === "car" ? "c" : route.name;
+    const next = slug ? `#/${prefix}/${carId}/${slug}` : `#/${prefix}/${carId}`;
     if (location.hash !== next) history.replaceState(null, "", next);
   }
 }
@@ -731,33 +838,103 @@ function bindPicker() {
   });
 }
 
-function bindFolderFiles(root = document) {
-  root.querySelectorAll("[data-folder-file]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      const key = input.getAttribute("data-folder-file");
-      const file = event.target.files && event.target.files[0];
-      const box = root.querySelector(`[data-folder-preview="${key}"]`) || document.querySelector(`[data-folder-preview="${key}"]`);
-      const previous = localFolderFiles.get(key);
-      if (previous && previous.url) URL.revokeObjectURL(previous.url);
-      if (!file) {
-        localFolderFiles.delete(key);
-        if (box) {
-          box.hidden = true;
-          box.innerHTML = "";
+async function hydrateMedia(carId, slug, root = document) {
+  const folder = root.querySelector("[data-media-folder]");
+  if (!folder) return;
+  const status = folder.querySelector("[data-media-status]");
+  try {
+    const items = await listFolderMedia(carId, slug);
+    const photos = items.filter((item) => item.kind === "photo");
+    const videos = items.filter((item) => item.kind === "video");
+    const photoCount = folder.querySelector("[data-photo-count]");
+    const videoCount = folder.querySelector("[data-video-count]");
+    if (photoCount) photoCount.textContent = `(${photos.length})`;
+    if (videoCount) videoCount.textContent = `(${videos.length})`;
+    const photoBox = folder.querySelector("[data-photo-gallery]");
+    if (photoBox) {
+      photoBox.innerHTML = photos.length
+        ? photos
+            .map((item) => {
+              const url = objectUrlFor(item);
+              return `<figure class="thumb">
+          <button type="button" class="thumb-btn" data-view-photo="${item.id}">
+            <img src="${url}" alt="${escapeHtml(item.name)}">
+          </button>
+          <figcaption>${escapeHtml(item.name)}</figcaption>
+          ${canEdit() ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
+        </figure>`;
+            })
+            .join("")
+        : `<p class="empty-media">Пока нет фотографий в этой папке.</p>`;
+    }
+    const videoBox = folder.querySelector("[data-video-gallery]");
+    if (videoBox) {
+      videoBox.innerHTML = videos.length
+        ? videos
+            .map((item) => {
+              const url = objectUrlFor(item);
+              return `<figure class="video-item">
+          <video controls preload="metadata" src="${url}"></video>
+          <figcaption>${escapeHtml(item.name)}</figcaption>
+          ${canEdit() ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
+        </figure>`;
+            })
+            .join("")
+        : `<p class="empty-media">Пока нет видео в этой папке.</p>`;
+    }
+    if (status) status.textContent = "";
+  } catch {
+    if (status) status.textContent = "Не удалось прочитать файлы из хранилища этого браузера.";
+  }
+}
+
+function bindMediaSection(root = document) {
+  const folders = [...root.querySelectorAll("[data-media-folder]")];
+  if (root.matches && root.matches("[data-media-folder]")) folders.unshift(root);
+  for (const folder of folders) {
+    if (folder.dataset.mediaBound === "1") continue;
+    folder.dataset.mediaBound = "1";
+    folder.addEventListener("change", async (event) => {
+      const input = event.target.closest("[data-media-upload]");
+      if (!input) return;
+      const carId = input.getAttribute("data-car");
+      const slug = input.getAttribute("data-dir");
+      const kind = input.getAttribute("data-media-upload");
+      const files = [...(input.files || [])];
+      input.value = "";
+      const status = folder.querySelector("[data-media-status]");
+      for (const file of files) {
+        const result = await addFolderMedia(carId, slug, file, kind);
+        if (!result.ok) {
+          if (status) status.textContent = result.error;
+          break;
         }
+        if (status) status.textContent = `«${file.name}» сохранён в папке этого автомобиля в этом браузере.`;
+      }
+      await hydrateMedia(carId, slug, folder.closest("#dirExpand") || document);
+    });
+    folder.addEventListener("click", async (event) => {
+      const del = event.target.closest("[data-del-media]");
+      if (del) {
+        const carId = folder.getAttribute("data-car");
+        const slug = folder.getAttribute("data-dir");
+        const result = await deleteFolderMedia(del.getAttribute("data-del-media"), carId, slug);
+        const status = folder.querySelector("[data-media-status]");
+        if (!result.ok && status) status.textContent = result.error;
+        await hydrateMedia(carId, slug, folder.closest("#dirExpand") || document);
         return;
       }
-      const [carId, directionId] = key.split("/");
-      const stored = { key, carId, directionId, name: file.name, url: URL.createObjectURL(file) };
-      localFolderFiles.set(key, stored);
-      if (box) {
-        const car = carMeta(carId);
-        const title = directionTitle(directionId);
-        box.hidden = false;
-        box.innerHTML = `<img alt="Локальный предпросмотр файла этой папки" src="${stored.url}"><p class="hint">«${escapeHtml(file.name)}» относится только к «${escapeHtml(car ? `${car.make} ${car.model}` : carId)}» / «${escapeHtml(title)}». Файл не отправлен на сервер.</p>`;
-      }
+      const view = event.target.closest("[data-view-photo]");
+      if (!view) return;
+      const viewer = folder.querySelector("[data-photo-viewer]");
+      const viewerImg = viewer?.querySelector("img");
+      const img = view.querySelector("img");
+      if (!viewer || !viewerImg || !img) return;
+      viewerImg.src = img.src;
+      viewerImg.alt = img.alt || "Просмотр фото";
+      if (typeof viewer.showModal === "function") viewer.showModal();
     });
-  });
+  }
 }
 
 function bindFieldRoot(root) {
@@ -776,13 +953,23 @@ function bindFieldRoot(root) {
       if (carState.status === "created" || carState.status === "published") {
         if (carState.status !== "published") carState.status = "in_progress";
       }
-      const head = document.querySelector(`[data-node="${dir}:${cp}"] .node-score`);
+      const head = document.querySelector(`[data-node="${nodeFolderKey(carId, dir, cp)}"] .node-score`);
       if (head && act === "score") head.textContent = nodeScoreLabel(result.score);
       scheduleSave();
       patchLiveSummaries(carId);
     };
     el.addEventListener("change", apply);
     el.addEventListener("input", apply);
+  });
+  root.querySelectorAll("[data-dir-note]").forEach((el) => {
+    el.addEventListener("input", () => {
+      const carId = el.getAttribute("data-car");
+      const dir = el.getAttribute("data-dir");
+      const field = el.getAttribute("data-dir-note");
+      ensureCarShape(state.cars[carId]);
+      state.cars[carId].directionNotes[dir][field] = el.value;
+      scheduleSave();
+    });
   });
   root.querySelectorAll("[data-submit]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -813,17 +1000,15 @@ function bind() {
   document.getElementById("resetDemo")?.addEventListener("click", () => {
     if (confirm("Сбросить учебные данные в этом браузере до исходных образцов?")) {
       clearState();
-      localFolderFiles.forEach((item) => {
-        if (item.url) URL.revokeObjectURL(item.url);
+      clearAllMedia().catch(() => {}).finally(() => {
+        state = createDefaultState();
+        persist();
+        render();
       });
-      localFolderFiles.clear();
-      state = createDefaultState();
-      persist();
-      render();
     }
   });
   document.getElementById("printReport")?.addEventListener("click", () => window.print());
-  bindFolderFiles(document);
+  bindMediaSection(document);
   document.querySelectorAll("[data-assign]").forEach((select) => {
     select.addEventListener("change", () => {
       const carId = select.getAttribute("data-assign");

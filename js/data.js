@@ -317,6 +317,25 @@ export const SAMPLE_CARS = [
   },
 ];
 
+export function emptyDirectionNotes() {
+  return Object.fromEntries(
+    DIRECTIONS.map((direction) => [direction.slug, { publicComment: "", internalComment: "" }]),
+  );
+}
+
+export function ensureCarShape(carState) {
+  if (!carState || typeof carState !== "object") return carState;
+  if (!carState.directionNotes) carState.directionNotes = emptyDirectionNotes();
+  for (const direction of DIRECTIONS) {
+    const current = carState.directionNotes[direction.slug] || {};
+    carState.directionNotes[direction.slug] = {
+      publicComment: current.publicComment || "",
+      internalComment: current.internalComment || "",
+    };
+  }
+  return carState;
+}
+
 export function createDefaultState() {
   return {
     version: 1,
@@ -329,6 +348,7 @@ export function createDefaultState() {
           "Демо-заключение: это учебный образец отчёта, а не осмотр реального автомобиля. Формула proposed-v1, непроверенные узлы исключены.",
         assignments: allReviewedAssignments(),
         results: publishedResults,
+        directionNotes: emptyDirectionNotes(),
         publishedSnapshot: {
           createdAt: "2026-11-01T12:00:00+05:00",
           scores: publishedScores,
@@ -341,6 +361,7 @@ export function createDefaultState() {
         conclusion: "",
         assignments: inProgressAssignments,
         results: inProgressResults,
+        directionNotes: emptyDirectionNotes(),
         publishedSnapshot: null,
       },
       "primer-crossover": {
@@ -353,6 +374,7 @@ export function createDefaultState() {
           }),
         ),
         results: emptyResults(),
+        directionNotes: emptyDirectionNotes(),
         publishedSnapshot: null,
       },
     },

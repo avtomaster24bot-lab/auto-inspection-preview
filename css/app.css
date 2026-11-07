@@ -64,6 +64,23 @@ nav a, .text-btn, .back { color: #f3e6c4; }
 h1, h2, h3 { line-height: 1.2; }
 .grid { display: grid; gap: 1rem; }
 .catalog.grid { grid-template-columns: 1fr; }
+.assessment-entry { margin: 1.1rem 0 1.4rem; padding: 0.9rem 1rem; background: #fffdf8; border: 1px solid var(--line); border-radius: 18px; }
+.assessment-entry .row { flex-wrap: wrap; }
+.dir-notes { display: grid; gap: 0.8rem; margin: 0.8rem 0 1rem; }
+.dir-notes textarea { width: 100%; min-height: 5.5rem; }
+.media-folders { display: grid; gap: 1.15rem; margin: 1rem 0; }
+.media-block h3 { margin: 0 0 0.55rem; }
+.photo-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.8rem; }
+.thumb img { width: 100%; height: 120px; object-fit: cover; border-radius: 12px; display: block; background: #eee6d6; }
+.thumb-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.thumb figcaption, .video-item figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; word-break: break-word; }
+.video-gallery { display: grid; gap: 1rem; }
+.video-item video { width: min(100%, 560px); border-radius: 12px; background: #111; }
+.file-btn { display: inline-flex; align-items: center; cursor: pointer; }
+.photo-viewer { border: 0; padding: 1rem; border-radius: 16px; max-width: min(960px, 94vw); }
+.photo-viewer::backdrop { background: rgba(20, 16, 10, 0.72); }
+.photo-viewer img { max-width: 100%; max-height: 78vh; display: block; margin: 0 auto 0.8rem; }
+.empty-media { color: var(--muted); margin: 0.2rem 0 0.6rem; }
 .card h2 { margin: 0.2rem 0; }
 .tag, .crit {
   display: inline-block;
@@ -283,14 +300,15 @@ a.dir-card:focus-visible, summary:focus-visible, .btn:focus-visible, select:focu
 @media (min-width: 700px) {
   .facts { grid-template-columns: repeat(2, 1fr); }
   .btn.wa { width: auto; }
+  .catalog.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 800px) {
   .top { grid-template-columns: 1.3fr 1fr 1fr; align-items: start; }
-  .catalog.grid { grid-template-columns: 1fr; }
 }
 @media (min-width: 980px) {
   .dir-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dir-illust, .dir-svg { height: 140px; }
+  .catalog.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media print {
   .badge, .top, .no-print, .back, .more, .dir-grid, .dir-expand { display: none !important; }
