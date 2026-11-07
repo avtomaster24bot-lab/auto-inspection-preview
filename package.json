@@ -2,7 +2,7 @@
   "name": "auto-inspection-preview",
   "private": true,
   "version": "1.0.0",
-  "description": "Статическое демо осмотра авто АвтоМастер24 / Трейд-ин. Без сервера и авторизации.",
+  "description": "Статическое демо осмотра авто Авто Лидер — Проверенные авто! Без сервера и авторизации.",
   "type": "module",
   "scripts": {
     "test": "node --test tests/demo.test.mjs",

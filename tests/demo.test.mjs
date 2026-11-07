@@ -390,7 +390,8 @@ test("share falls back without claiming success and install uses a real manifest
   assert.equal(manifest.scope, "/auto-inspection-preview/");
   assert.equal(manifest.start_url, "/auto-inspection-preview/");
   assert.equal(manifest.display, "standalone");
-  assert.equal(manifest.short_name, "АвтоМастер24");
+  assert.equal(manifest.short_name, "Авто Лидер");
+  assert.equal(manifest.name, "Авто Лидер — Проверенные авто!");
   assert.match(sw, /am24-shell-\$\{VERSION\}/);
   assert.match(sw, new RegExp(`const VERSION = "${ASSET_VERSION}"`));
   assert.match(sw, /blob:/);
@@ -398,4 +399,29 @@ test("share falls back without claiming success and install uses a real manifest
   assert.equal(existsSync(new URL("../images/icon-192.png", import.meta.url)), true);
   assert.equal(existsSync(new URL("../images/icon-512.png", import.meta.url)), true);
   assert.equal(existsSync(new URL("../images/apple-touch-icon.png", import.meta.url)), true);
+});
+
+test("public preview uses Авто Лидер brand and tomography tagline once per sheet", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  assert.match(app, /const BRAND_NAME = "Авто Лидер"/);
+  assert.match(app, /const BRAND_SUBLINE = "Проверенные авто!"/);
+  assert.match(app, /const BRAND_FULL = "Авто Лидер — Проверенные авто!"/);
+  assert.match(app, /const BRAND_TAGLINE = "Томография автомобиля"/);
+  assert.match(app, /class="logo">\$\{BRAND_NAME\}/);
+  assert.match(app, /class="brand-sub">\$\{BRAND_SUBLINE\}/);
+  assert.match(app, /class="lead motto">\$\{BRAND_TAGLINE\}/);
+  assert.equal(app.includes("АвтоМастер24"), false);
+  assert.equal(html.includes("АвтоМастер24"), false);
+  assert.match(html, /Авто Лидер — Проверенные авто!/);
+  assert.match(html, /apple-mobile-web-app-title" content="Авто Лидер"/);
+  assert.match(css, /\.brand-sub/);
+  assert.match(css, /\.motto/);
+  const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function unpublishedBlock"));
+  const car = app.slice(app.indexOf("function renderCar"), app.indexOf("function renderAdmin"));
+  assert.match(home, /BRAND_TAGLINE/);
+  assert.match(car, /BRAND_TAGLINE/);
+  const buttons = app.slice(app.indexOf("function directionButtonsHTML"), app.indexOf("function masterFilterNote"));
+  assert.equal(buttons.includes("BRAND_TAGLINE"), false);
 });

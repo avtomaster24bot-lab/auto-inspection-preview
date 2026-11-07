@@ -1,11 +1,11 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108c";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108c";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108c";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108c";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108c";
-import { directionThumb } from "./icons.js?v=20261108c";
-import { folderKey } from "./folder.js?v=20261108c";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108c";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108d";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108d";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108d";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108d";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108d";
+import { directionThumb } from "./icons.js?v=20261108d";
+import { folderKey } from "./folder.js?v=20261108d";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108d";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -15,8 +15,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108c";
-import { ASSET_VERSION } from "./version.js?v=20261108c";
+} from "./media.js?v=20261108d";
+import { ASSET_VERSION } from "./version.js?v=20261108d";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -24,6 +24,11 @@ const STATUS_LABEL = {
   in_review: "на проверке",
   published: "опубликован",
 };
+
+const BRAND_NAME = "Авто Лидер";
+const BRAND_SUBLINE = "Проверенные авто!";
+const BRAND_FULL = "Авто Лидер — Проверенные авто!";
+const BRAND_TAGLINE = "Томография автомобиля";
 
 const MASTER_FILTER_NOTE =
   "В режиме мастера — только назначенные разделы; посмотреть все в режиме покупателя (опубликованный отчёт)/администратора";
@@ -166,8 +171,8 @@ function header() {
       : "";
   return `<header class="top">
     <div class="brand">
-      <a href="#/" class="logo">АвтоМастер24 <span>/ Трейд-ин</span></a>
-      <p>Независимая диагностика перед покупкой</p>
+      <a href="#/" class="logo">${BRAND_NAME}</a>
+      <p class="brand-sub">${BRAND_SUBLINE}</p>
     </div>
     <nav>
       <a href="#/">Все автомобили</a>
@@ -534,6 +539,7 @@ function renderHome() {
   return `${header()}
     <main class="wrap">
       <h1>Выберите автомобиль</h1>
+      <p class="lead motto">${BRAND_TAGLINE}</p>
       <p class="lead">Сначала выберите машину. Оценки, фото и видео откроются в её оценочном листе.</p>
       <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
     </main>`;
@@ -566,6 +572,7 @@ function renderCar(id, route = parseRoute()) {
       </nav>
       <p class="tag">Оценочный лист · ${car.label}</p>
       <h1>${car.make} ${car.model}, ${car.year}</h1>
+      <p class="lead motto">${BRAND_TAGLINE}</p>
       <section class="sheet-top">
         ${carPhoto(car, "hero-visual photo-auto", "Фото авто · учебная иллюстрация, не фото реального осмотра")}
         ${unpublished ? "" : carSchemeHTML(dirs, scores, unpublished)}
@@ -663,9 +670,9 @@ function render() {
 function pageTitle(route) {
   if (isCarRoute(route) && route.id) {
     const car = carMeta(route.id);
-    if (car) return `АвтоМастер24-Трейд-ин_оценочный-лист_${car.make}-${car.model}-${car.year}_демо`.replaceAll(" ", "-");
+    if (car) return `${BRAND_NAME} — ${car.make} ${car.model}, ${car.year}`;
   }
-  return "АвтоМастер24 / Трейд-ин — демонстрация осмотра";
+  return BRAND_FULL;
 }
 
 function applySeverityClass(el, summary) {
@@ -1025,14 +1032,14 @@ function sharePayload() {
   if (isCarRoute(route) && route.id && carMeta(route.id)) {
     const car = carMeta(route.id);
     return {
-      title: `${car.make} ${car.model}, ${car.year} — АвтоМастер24`,
+      title: `${car.make} ${car.model}, ${car.year} — ${BRAND_NAME}`,
       text: `Оценочный лист: ${car.make} ${car.model}, ${car.year}`,
       url: buildPublicCarUrl(siteBase(), route.id),
     };
   }
   return {
-    title: "АвтоМастер24 / Трейд-ин",
-    text: "Учебный предпросмотр независимого осмотра автомобиля.",
+    title: BRAND_FULL,
+    text: BRAND_TAGLINE,
     url: siteBase(),
   };
 }

@@ -1,6 +1,6 @@
 {
-  "name": "АвтоМастер24 / Трейд-ин",
-  "short_name": "АвтоМастер24",
+  "name": "Авто Лидер — Проверенные авто!",
+  "short_name": "Авто Лидер",
   "description": "Учебный предпросмотр оценочного листа. Данные хранятся только в этом браузере.",
   "start_url": "/auto-inspection-preview/",
   "scope": "/auto-inspection-preview/",

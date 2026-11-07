@@ -62,11 +62,24 @@ img { max-width: 100%; height: auto; }
 .logo {
   color: white;
   text-decoration: none;
-  font-size: 1.45rem;
-  font-weight: 750;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
-.logo span { color: var(--focus); font-weight: 500; }
-.brand p { margin: 0.25rem 0 0; color: #d5e4db; }
+.brand-sub {
+  margin: 0.2rem 0 0;
+  color: var(--focus);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.brand p:not(.brand-sub) { margin: 0.25rem 0 0; color: #d5e4db; }
+.motto {
+  max-width: 42rem;
+  margin: 0 0 0.85rem;
+  font-size: 1.08rem;
+  color: var(--ink);
+}
 nav { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .top .header-action {
   background: #0f2b23;
