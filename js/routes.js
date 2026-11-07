@@ -26,3 +26,20 @@ export function canonicalHash(route) {
   }
   return "#/";
 }
+
+export function panelDomId(carId, slug) {
+  return `dir-panel-${carId}-${slug}`;
+}
+
+export function toggleOpenDir(openDirs, slug) {
+  const next = new Set(openDirs);
+  if (next.has(slug)) next.delete(slug);
+  else next.add(slug);
+  return next;
+}
+
+export function hashDirFromOpen(openDirs, preferred = null) {
+  if (preferred && openDirs.has(preferred)) return preferred;
+  const first = openDirs.values().next();
+  return first.done ? null : first.value;
+}

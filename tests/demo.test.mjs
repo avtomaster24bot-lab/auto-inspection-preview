@@ -298,3 +298,30 @@ test("photo gallery thumbnails keep a 120px grid and viewer can upscale", () => 
   assert.match(css, /\.photo-viewer img\s*\{[^}]*object-fit:\s*contain/s);
   assert.equal(css.includes("minmax(96px, 1fr)"), false);
 });
+
+import { panelDomId, toggleOpenDir, hashDirFromOpen } from "../js/routes.js";
+
+test("category details sit under their own card and toggle independently", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const picker = app.slice(app.indexOf("function directionItemHTML"), app.indexOf("function directionNotesHTML"));
+  assert.match(picker, /class="direction-item"/);
+  assert.match(picker, /panelDomId\(carId, slug\)/);
+  assert.match(picker, /folderPanelHTML\(carId, slug\)/);
+  assert.match(picker, /aria-controls=/);
+  assert.equal(picker.includes('id="dirExpand"'), false);
+  assert.equal(app.includes('id="dirExpand"'), false);
+  assert.equal(app.includes("scrollIntoView"), false);
+  assert.match(app, /function toggleDirection/);
+  assert.equal(panelDomId("primer-sedan", "hodovaya"), "dir-panel-primer-sedan-hodovaya");
+  assert.notEqual(panelDomId("primer-sedan", "hodovaya"), panelDomId("primer-sedan", "engine"));
+  const first = toggleOpenDir(new Set(), "hodovaya");
+  assert.equal(first.has("hodovaya"), true);
+  const both = toggleOpenDir(first, "engine");
+  assert.equal(both.has("hodovaya"), true);
+  assert.equal(both.has("engine"), true);
+  const afterClose = toggleOpenDir(both, "hodovaya");
+  assert.equal(afterClose.has("hodovaya"), false);
+  assert.equal(afterClose.has("engine"), true);
+  assert.equal(hashDirFromOpen(afterClose, "hodovaya"), "engine");
+  assert.equal(hashDirFromOpen(new Set(), "hodovaya"), null);
+});

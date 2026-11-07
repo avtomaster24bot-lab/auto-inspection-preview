@@ -243,8 +243,15 @@ dd { margin: 0; font-weight: 650; }
   gap: 0.9rem;
   grid-template-columns: 1fr;
 }
+.direction-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  align-self: start;
+}
 .dir-card {
   display: grid;
+  width: 100%;
   text-align: left;
   padding: 0;
   overflow: hidden;
@@ -281,7 +288,24 @@ dd { margin: 0; font-weight: 650; }
 .more::after { content: " ▾"; }
 .dir-card.is-selected { outline: 3px solid var(--focus); outline-offset: 2px; }
 .dir-card.is-selected .more::after { content: " ▴"; }
-.dir-expand { margin-top: 0.95rem; padding: 1rem 1.1rem 1.2rem; }
+.dir-expand {
+  margin-top: 0.55rem;
+  padding: 0.85rem 0.9rem 1rem;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.direction-item .dir-expand textarea,
+.direction-item .dir-expand input,
+.direction-item .dir-expand select,
+.direction-item .dir-expand video,
+.direction-item .dir-expand img,
+.direction-item .dir-expand table {
+  max-width: 100%;
+}
+.direction-item .video-item video {
+  max-width: 100%;
+}
 .dir-notes { display: grid; gap: 0.8rem; margin: 0.8rem 0 1rem; }
 .dir-notes textarea, textarea, input, select {
   width: 100%;
@@ -446,7 +470,7 @@ a.dir-card:focus-visible, summary:focus-visible, .btn:focus-visible, select:focu
   .assessment-head .hero-visual { margin: 0; border: 0; }
 }
 @media (min-width: 980px) {
-  .dir-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dir-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dir-photo { height: 160px; }
   .catalog.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

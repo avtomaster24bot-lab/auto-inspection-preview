@@ -5,7 +5,7 @@ import { loadState, saveState, clearState } from "./storage.js";
 import { summarizeDirection, summarizeOverall, directionTitle } from "./summary.js";
 import { directionIcon } from "./icons.js";
 import { folderKey, nodeFolderKey } from "./folder.js";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash, panelDomId, toggleOpenDir, hashDirFromOpen } from "./routes.js";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -267,10 +267,15 @@ function cardFace(direction, summary, more) {
     </div>`;
 }
 
-function pickerCard(direction, summary, selected) {
-  return `<button type="button" class="dir-card ${severityClass(summary)}${selected ? " is-selected" : ""}" data-select-dir="${direction.slug}" aria-expanded="${selected ? "true" : "false"}" aria-controls="dirExpand">
-    ${cardFace(direction, summary, selected ? "Скрыть подробности" : "Открыть подробности")}
-  </button>`;
+function directionItemHTML(carId, direction, summary, open) {
+  const slug = direction.slug;
+  const pid = panelDomId(carId, slug);
+  return `<article class="direction-item" data-direction-item="${slug}">
+    <button type="button" class="dir-card ${severityClass(summary)}${open ? " is-selected" : ""}" data-select-dir="${slug}" aria-expanded="${open ? "true" : "false"}" aria-controls="${pid}">
+      ${cardFace(direction, summary, open ? "Скрыть подробности" : "Открыть подробности")}
+    </button>
+    <div id="${pid}" class="dir-expand" data-dir-panel="${slug}" data-car="${carId}" ${open ? "" : "hidden"}>${open ? folderPanelHTML(carId, slug) : ""}</div>
+  </article>`;
 }
 
 function directionNotesHTML(carId, slug, editable) {
@@ -445,18 +450,16 @@ function printAllHTML(carId, dirs) {
     .join("")}</div>`;
 }
 
-function directionPicker(carId, dirs, scores, unpublished, selected) {
+function directionPicker(carId, dirs, scores, unpublished) {
   if (!dirs.length) return `<p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>`;
-  const tiles = dirs
+  const items = dirs
     .map((direction) => {
       const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
       const summary = summarizeDirection(dirScore, { unpublished });
-      return pickerCard(direction, summary, selected === direction.slug);
+      return directionItemHTML(carId, direction, summary, openDirs.has(direction.slug));
     })
     .join("");
-  const panel = selected ? folderPanelHTML(carId, selected) : "";
-  return `<div class="dir-grid">${tiles}</div>
-    <div id="dirExpand" class="dir-expand" ${selected ? "" : "hidden"}>${panel || ""}</div>`;
+  return `<div class="dir-grid">${items}</div>`;
 }
 
 function carCard(car) {
@@ -535,7 +538,7 @@ function renderCar(id, route = parseRoute()) {
       ${!unpublished && conclusion ? `<section class="highlights"><h2>Заключение</h2><p>${escapeHtml(conclusion)}</p></section>` : ""}
       ${unpublished ? "" : conditionLegend()}
       ${unpublished ? "" : `<h2>Диагностика по направлениям</h2><p class="lead">Нажмите картинку, чтобы открыть описание, фото, видео и список узлов.</p>`}
-      ${unpublished ? "" : directionPicker(id, dirs, scores, unpublished, selected)}
+      ${unpublished ? "" : directionPicker(id, dirs, scores, unpublished)}
       ${unpublished ? "" : `<p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>`}
       ${unpublished ? "" : printAllHTML(id, dirs)}
       ${renderWhatsApp(car)}
@@ -598,8 +601,12 @@ function render() {
   document.getElementById("app").innerHTML = html;
   document.title = pageTitle(route);
   bind();
-  const panel = document.getElementById("dirExpand");
-  if (panel && route.dir && route.id) hydrateMedia(route.id, route.dir, panel);
+  if (isCarRoute(route) && route.id) {
+    for (const slug of openDirs) {
+      const panel = document.getElementById(panelDomId(route.id, slug));
+      if (panel && !panel.hidden) hydrateMedia(route.id, slug, panel);
+    }
+  }
 }
 
 function pageTitle(route) {
@@ -638,52 +645,57 @@ function bindDisclosure(root = document) {
   });
 }
 
-function applySelectedDirection(slug, { updateHash = true } = {}) {
+function syncDirButton(slug, open) {
+  document.querySelectorAll(`[data-select-dir="${slug}"]`).forEach((el) => {
+    el.classList.toggle("is-selected", open);
+    el.setAttribute("aria-expanded", open ? "true" : "false");
+    const more = el.querySelector(".more");
+    if (more) more.textContent = open ? "Скрыть подробности" : "Открыть подробности";
+  });
+}
+
+function expandDirectionPanel(carId, slug) {
+  const panel = document.getElementById(panelDomId(carId, slug));
+  if (!panel) return;
+  if (!panel.innerHTML.trim()) {
+    panel.innerHTML = folderPanelHTML(carId, slug);
+    bindFieldRoot(panel);
+    bindDisclosure(panel);
+    bindMediaSection(panel);
+    hydrateMedia(carId, slug, panel);
+  }
+  panel.hidden = false;
+}
+
+function collapseDirectionPanel(carId, slug) {
+  const panel = document.getElementById(panelDomId(carId, slug));
+  if (!panel) return;
+  revokeFolderObjectUrls(carId, slug);
+  panel.hidden = true;
+  panel.innerHTML = "";
+}
+
+function toggleDirection(slug, { updateHash = true } = {}) {
   const route = parseRoute();
   const carId = route.id;
+  if (!carId || !slug) return;
+  const next = toggleOpenDir(openDirs, slug);
   openDirs.clear();
-  if (slug) openDirs.add(slug);
-  document.querySelectorAll("[data-select-dir]").forEach((el) => {
-    const on = el.getAttribute("data-select-dir") === slug;
-    el.classList.toggle("is-selected", on);
-    el.setAttribute("aria-expanded", on ? "true" : "false");
-    const more = el.querySelector(".more");
-    if (more) more.textContent = on ? "Скрыть подробности" : "Открыть подробности";
-  });
-  const panel = document.getElementById("dirExpand");
-  if (panel) {
-    const prevFolder = panel.getAttribute("data-open-folder");
-    if (prevFolder) {
-      const [cid, did] = prevFolder.split("/");
-      if (cid && did) revokeFolderObjectUrls(cid, did);
-    }
-    if (!slug) {
-      panel.hidden = true;
-      panel.innerHTML = "";
-      panel.removeAttribute("data-open-folder");
-    } else {
-      panel.hidden = false;
-      panel.innerHTML = folderPanelHTML(carId, slug);
-      panel.setAttribute("data-open-folder", folderKey(carId, slug));
-      bindFieldRoot(panel);
-      bindDisclosure(panel);
-      bindMediaSection(panel);
-      hydrateMedia(carId, slug, panel);
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-  if (updateHash && carId && isCarRoute(route)) {
-    const next = canonicalHash({ name: "car", id: carId, dir: slug || null });
-    if (location.hash !== next) history.replaceState(null, "", next);
+  next.forEach((item) => openDirs.add(item));
+  const open = openDirs.has(slug);
+  syncDirButton(slug, open);
+  if (open) expandDirectionPanel(carId, slug);
+  else collapseDirectionPanel(carId, slug);
+  if (updateHash && isCarRoute(route)) {
+    const nextHash = canonicalHash({ name: "car", id: carId, dir: hashDirFromOpen(openDirs, slug) });
+    if (location.hash !== nextHash) history.replaceState(null, "", nextHash);
   }
 }
 
 function bindPicker() {
   document.querySelectorAll("[data-select-dir]").forEach((button) => {
     button.addEventListener("click", () => {
-      const slug = button.getAttribute("data-select-dir");
-      const route = parseRoute();
-      applySelectedDirection(route.dir === slug ? null : slug);
+      toggleDirection(button.getAttribute("data-select-dir"));
     });
   });
 }
@@ -782,7 +794,7 @@ function bindMediaSection(root = document) {
         }
         if (status) status.textContent = `«${file.name}» сохранён в папке этого автомобиля в этом браузере.`;
       }
-      await hydrateMedia(carId, slug, folder.closest("#dirExpand") || document);
+      await hydrateMedia(carId, slug, folder.closest("[data-dir-panel]") || folder);
     });
     folder.addEventListener("click", async (event) => {
       const del = event.target.closest("[data-del-media]");
@@ -792,7 +804,7 @@ function bindMediaSection(root = document) {
         const result = await deleteFolderMedia(del.getAttribute("data-del-media"), carId, slug);
         const status = folder.querySelector("[data-media-status]");
         if (!result.ok && status) status.textContent = result.error;
-        await hydrateMedia(carId, slug, folder.closest("#dirExpand") || document);
+        await hydrateMedia(carId, slug, folder.closest("[data-dir-panel]") || folder);
         return;
       }
       const view = event.target.closest("[data-view-photo]");
