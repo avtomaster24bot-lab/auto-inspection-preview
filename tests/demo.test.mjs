@@ -112,3 +112,46 @@ test("local demo state round-trip", () => {
   clearState(memory);
   assert.equal(loadState(memory), null);
 });
+
+import { conditionFromScore, summarizeDirection, summarizeOverall, CONDITION_LABELS } from "../js/summary.js";
+import { DIRECTION_ICON_SLUGS } from "../js/icons.js";
+
+test("unchecked and missing scores never look like zero", () => {
+  assert.equal(conditionFromScore(null).label, CONDITION_LABELS.unchecked);
+  assert.equal(conditionFromScore(7, 0).label, CONDITION_LABELS.unchecked);
+  const empty = summarizeDirection({ score: null, checked: 0, total: 21, criticalFaults: [] });
+  assert.equal(empty.kind, "unchecked");
+  assert.equal(empty.scoreText, "—/10");
+  assert.equal(empty.displayScore, null);
+  assert.equal(empty.coverageText, "0 из 21");
+  assert.equal(empty.hasCritical, false);
+});
+
+test("plain language bands and critical warning", () => {
+  assert.equal(summarizeDirection({ score: 8, checked: 10, total: 10, criticalFaults: [] }).label, "Хорошее состояние");
+  assert.equal(summarizeDirection({ score: 7.8, checked: 10, total: 10, criticalFaults: [] }).scoreText, "7,8/10");
+  assert.equal(summarizeDirection({ score: 6.2, checked: 4, total: 8, criticalFaults: [] }).label, "Есть замечания");
+  assert.equal(summarizeDirection({ score: 4.9, checked: 8, total: 8, criticalFaults: [] }).label, "Нужен ремонт");
+  const critical = summarizeDirection({
+    score: 7.2,
+    checked: 8,
+    total: 8,
+    criticalFaults: [{ name: "Лонжерон" }],
+  });
+  assert.equal(critical.hasCritical, true);
+  assert.equal(critical.criticalCount, 1);
+  assert.notEqual(critical.label, CONDITION_LABELS.unchecked);
+});
+
+test("unpublished overview hides live numbers", () => {
+  const summary = summarizeOverall({ displayedScore: 8.4, checked: 80, total: 91, criticalFaults: [] }, { unpublished: true });
+  assert.equal(summary.kind, "unpublished");
+  assert.equal(summary.label, "Отчёт ещё не опубликован");
+  assert.equal(summary.scoreText, "—/10");
+  assert.equal(summary.displayScore, null);
+  assert.equal(summary.hasCritical, false);
+});
+
+test("each diagnostic direction has its own pictogram", () => {
+  assert.deepEqual(DIRECTION_ICON_SLUGS.sort(), ["body", "electric", "engine", "geometry", "hodovaya", "interior", "wheels"]);
+});
