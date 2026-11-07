@@ -5,8 +5,8 @@
   "start_url": "/auto-inspection-preview/",
   "scope": "/auto-inspection-preview/",
   "display": "standalone",
-  "background_color": "#f3efe6",
-  "theme_color": "#14352b",
+  "background_color": "#e8eef4",
+  "theme_color": "#0b1f33",
   "lang": "ru",
   "icons": [
     {

@@ -1,4 +1,4 @@
-import { formatScore } from "./scoring.js?v=20261108e";
+import { formatScore } from "./scoring.js?v=20261108f";
 
 export const CONDITION_GOOD_MIN = 8;
 export const CONDITION_NOTES_MIN = 5;
@@ -9,6 +9,12 @@ export const CONDITION_LABELS = {
   notes: "Есть замечания",
   repair: "Нужен ремонт",
   unpublished: "Отчёт ещё не опубликован",
+};
+
+export const COMPLETION_LABELS = {
+  none: "Проверки ещё не выполнены",
+  preliminary: "Предварительная оценка",
+  complete: "Осмотр завершён",
 };
 
 export const DIRECTION_TITLES = {
@@ -96,4 +102,50 @@ export function summarizeOverall(scores = {}, options = {}) {
     },
     options,
   );
+}
+
+export function severityClass(summary = {}) {
+  const kind = summary.kind || "unchecked";
+  return `kind-${kind}${summary.hasCritical ? " has-critical" : ""}`;
+}
+
+export function inspectionProgress(scores = {}, options = {}) {
+  const total = Number(scores.total) || 0;
+  const checked = Number(scores.checked) || 0;
+  if (options.unpublished) {
+    const summary = summarizeOverall(scores, { unpublished: true });
+    return {
+      ...summary,
+      key: "unpublished",
+      completionLabel: CONDITION_LABELS.unpublished,
+      checked: 0,
+      total,
+    };
+  }
+  const summary = summarizeOverall(scores, options);
+  if (checked === 0) {
+    return {
+      ...summary,
+      key: "none",
+      completionLabel: COMPLETION_LABELS.none,
+      checked,
+      total,
+    };
+  }
+  if (total > 0 && checked >= total) {
+    return {
+      ...summary,
+      key: "complete",
+      completionLabel: COMPLETION_LABELS.complete,
+      checked,
+      total,
+    };
+  }
+  return {
+    ...summary,
+    key: "preliminary",
+    completionLabel: COMPLETION_LABELS.preliminary,
+    checked,
+    total,
+  };
 }

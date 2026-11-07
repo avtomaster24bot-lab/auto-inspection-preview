@@ -1,21 +1,23 @@
-const VERSION = "20261108e";
+const VERSION = "20261108f";
 const CACHE = `am24-shell-${VERSION}`;
 const SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./css/app.css?v=20261108e",
-  "./js/app.js?v=20261108e",
-  "./js/data.js?v=20261108e",
-  "./js/scoring.js?v=20261108e",
-  "./js/whatsapp.js?v=20261108e",
-  "./js/storage.js?v=20261108e",
-  "./js/summary.js?v=20261108e",
-  "./js/icons.js?v=20261108e",
-  "./js/folder.js?v=20261108e",
-  "./js/routes.js?v=20261108e",
-  "./js/media.js?v=20261108e",
-  "./js/version.js?v=20261108e",
+  "./css/app.css?v=20261108f",
+  "./js/app.js?v=20261108f",
+  "./js/data.js?v=20261108f",
+  "./js/scoring.js?v=20261108f",
+  "./js/whatsapp.js?v=20261108f",
+  "./js/storage.js?v=20261108f",
+  "./js/summary.js?v=20261108f",
+  "./js/icons.js?v=20261108f",
+  "./js/folder.js?v=20261108f",
+  "./js/routes.js?v=20261108f",
+  "./js/media.js?v=20261108f",
+  "./js/access.js?v=20261108f",
+  "./js/scheme.js?v=20261108f",
+  "./js/version.js?v=20261108f",
   "./images/icon-192.png",
   "./images/icon-512.png",
   "./images/apple-touch-icon.png",
@@ -46,30 +48,21 @@ self.addEventListener("fetch", (event) => {
   if (url.protocol === "blob:" || url.protocol === "data:") return;
   if (url.origin !== self.location.origin) return;
 
-  const isHtml = request.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith(".html");
-  if (isHtml) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("./index.html"))),
-    );
-    return;
-  }
-
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         if (response && response.ok) {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy));
         }
         return response;
-      });
-    }),
+      })
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
+          const isHtml = request.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith(".html");
+          return isHtml ? caches.match("./index.html") : undefined;
+        }),
+      ),
   );
 });

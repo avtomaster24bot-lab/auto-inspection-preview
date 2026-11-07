@@ -356,7 +356,7 @@ test("seven named directions stay independent with requested button order", () =
   assert.ok(DIRECTION_IMAGES.hodovaya && DIRECTION_IMAGES.body && DIRECTION_IMAGES.engine && DIRECTION_IMAGES.electric);
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
   assert.equal(app.includes("Узлы направления"), false);
-  assert.match(app, /Разделы диагностики/);
+  assert.match(app, /Выберите раздел/);
   assert.match(app, /function directionButtonsHTML/);
   const state = createDefaultState();
   assert.equal(Object.keys(state.cars["primer-sedan"].results.hodovaya).length, 21);
@@ -430,4 +430,165 @@ test("public preview uses Авто Лидер brand and clarity slogan without t
   assert.equal(buttons.includes("BRAND_TAGLINE"), false);
   assert.equal(app.toLowerCase().includes("томограф"), false);
   assert.equal(html.toLowerCase().includes("томограф"), false);
+});
+
+
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore } from "../js/access.js";
+import { carTopSvg, carSideSvg } from "../js/scheme.js";
+
+test("all seven category buttons stay visible and master edits stay assigned-only", () => {
+  const state = createDefaultState();
+  const published = state.cars["primer-sedan"];
+  const inProgress = state.cars["primer-universal"];
+  const slugs = visibleDirections().map((direction) => direction.slug);
+  assert.deepEqual(slugs, DIRECTION_DISPLAY_ORDER);
+  assert.equal(slugs.length, 7);
+
+  assert.equal(canEditDirection("master", "master-3", published, "body"), true);
+  assert.equal(canEditDirection("master", "master-3", published, "interior"), true);
+  assert.equal(canEditDirection("master", "master-3", published, "geometry"), true);
+  assert.equal(canEditDirection("master", "master-3", published, "hodovaya"), false);
+  assert.equal(canEditDirection("master", "master-3", published, "engine"), false);
+  assert.equal(canEditDirection("master", "master-3", published, "electric"), false);
+  assert.equal(canEditDirection("master", "master-3", published, "wheels"), false);
+  assert.equal(directionAccess("master", "master-3", published, "hodovaya"), "public");
+  assert.equal(directionAccess("master", "master-3", inProgress, "hodovaya"), "blocked");
+  assert.equal(directionAccess("master", "master-3", inProgress, "body"), "edit");
+  assert.equal(canSeeInternalFor("master", "master-3", published, "hodovaya"), false);
+  assert.equal(canSeeInternalFor("master", "master-3", published, "body"), true);
+  assert.match(unpublishedSectionMessage("master", "master-3", inProgress, "hodovaya"), /Редактирует другой специалист/);
+  assert.match(unpublishedSectionMessage("master", "master-3", inProgress, "hodovaya"), /Раздел ещё не опубликован/);
+
+  assert.equal(canEditDirection("master", "master-1", published, "hodovaya"), true);
+  assert.equal(canEditDirection("master", "master-1", published, "wheels"), true);
+  assert.equal(canEditDirection("master", "master-1", published, "body"), false);
+  assert.equal(directionAccess("master", "master-1", published, "body"), "public");
+  assert.equal(directionAccess("master", "master-1", inProgress, "body"), "blocked");
+  assert.equal(directionAccess("master", "master-1", inProgress, "hodovaya"), "edit");
+
+  assert.equal(canEditDirection("admin", "master-1", published, "electric"), true);
+  assert.equal(canEditDirection("buyer", null, published, "body"), false);
+  assert.equal(directionAccess("buyer", null, published, "body"), "public");
+  assert.equal(directionAccess("buyer", null, inProgress, "body"), "blocked");
+  assert.equal(unpublishedSectionMessage("buyer", null, inProgress, "body"), "Раздел ещё не опубликован.");
+
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const scheme = readFileSync(fileURLToPath(new URL("../js/scheme.js", import.meta.url)), "utf8");
+  const accessSrc = readFileSync(fileURLToPath(new URL("../js/access.js", import.meta.url)), "utf8");
+  assert.match(app, /visibleDirections\(\)/);
+  assert.equal(app.includes("DIRECTIONS.filter((direction) => carState.assignments"), false);
+  assert.equal(app.includes("посмотреть все в режиме покупателя"), false);
+  assert.match(accessSrc, /Редактирует другой специалист/);
+  assert.match(app, /unpublishedSectionMessage/);
+  assert.match(app, /Раздел ещё не опубликован/);
+  assert.match(app, /canEditDir\(/);
+  assert.match(app, /Вид сверху/);
+  assert.match(app, /Вид сбоку/);
+  assert.match(app, /carTopSvg/);
+  assert.match(app, /carSideSvg/);
+  assert.match(scheme, /viewBox="0 0 760 360"/);
+  assert.match(scheme, /viewBox="0 0 760 300"/);
+  assert.match(scheme, /scheme-hit/);
+  assert.match(css, /#0b1f33/);
+  assert.equal(css.includes("#f3efe6"), false);
+  assert.equal(css.includes("#2c2418"), false);
+  assert.equal(/\.badge\s*\{[^}]*position:\s*sticky/s.test(css), false);
+  assert.match(css, /\.dir-chevron/);
+});
+
+test("published snapshot stays readable and unpublished drafts do not leak", () => {
+  const state = createDefaultState();
+  const sedan = state.cars["primer-sedan"];
+  const uni = state.cars["primer-universal"];
+  const liveUni = liveScoresForCar(uni);
+  assert.notEqual(liveUni.directionScores.find((item) => item.id === "engine").score, null);
+  const hidden = authorizedDirectionScore("master", "master-3", uni, "engine");
+  assert.equal(hidden.unpublished, true);
+  assert.equal(hidden.dirScore.score, null);
+  const shown = authorizedDirectionScore("master", "master-3", sedan, "engine");
+  assert.equal(shown.access, "public");
+  assert.equal(shown.dirScore.score, sedan.publishedSnapshot.scores.directionScores.find((item) => item.id === "engine").score);
+  const adminOverview = authorizedOverview("admin", "master-1", uni);
+  const masterOverview = authorizedOverview("master", "master-3", uni);
+  assert.ok(masterOverview.scores.checked < adminOverview.scores.checked);
+  assert.notEqual(masterOverview.scores.displayedScore, adminOverview.scores.displayedScore);
+  const buyerDraft = authorizedOverview("buyer", "", uni);
+  assert.equal(buyerDraft.unpublished, true);
+  assert.equal(buyerDraft.scores.displayedScore, null);
+  assert.equal(buyerDraft.scores.criticalFaults.length, 0);
+  const buyerSedan = authorizedOverview("buyer", "", sedan);
+  assert.equal(buyerSedan.scores.checked, 80);
+  assert.equal(buyerSedan.scores.total, 91);
+  assert.equal(buyerSedan.scores.displayedScore, 7);
+});
+
+
+
+import { inspectionProgress, COMPLETION_LABELS } from "../js/summary.js";
+import { MEDIA_DB_NAME } from "../js/media.js";
+
+test("final score sits after category buttons and uses completion labels", () => {
+  const state = createDefaultState();
+  const sedanScores = state.cars["primer-sedan"].publishedSnapshot.scores;
+  const prelim = inspectionProgress(sedanScores);
+  assert.equal(prelim.key, "preliminary");
+  assert.equal(prelim.completionLabel, COMPLETION_LABELS.preliminary);
+  assert.equal(prelim.completionLabel, "Предварительная оценка");
+  assert.equal(prelim.checked, 80);
+  assert.equal(prelim.total, 91);
+  assert.equal(prelim.scoreText, "7,0/10");
+  assert.equal(prelim.hasCritical, true);
+
+  const none = inspectionProgress({ displayedScore: null, checked: 0, total: 91, criticalFaults: [] });
+  assert.equal(none.key, "none");
+  assert.equal(none.completionLabel, "Проверки ещё не выполнены");
+  assert.equal(none.scoreText, "—/10");
+
+  const done = inspectionProgress({ displayedScore: 8, checked: 91, total: 91, criticalFaults: [] });
+  assert.equal(done.key, "complete");
+  assert.equal(done.completionLabel, "Осмотр завершён");
+  assert.equal(done.scoreText, "8,0/10");
+
+  const hidden = inspectionProgress({ displayedScore: 7, checked: 80, total: 91, criticalFaults: [{ name: "X" }] }, { unpublished: true });
+  assert.equal(hidden.key, "unpublished");
+  assert.equal(hidden.scoreText, "—/10");
+  assert.equal(hidden.hasCritical, false);
+
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const carFn = app.slice(app.indexOf("function renderCar"), app.indexOf("function renderAdmin"));
+  assert.ok(carFn.indexOf("directionButtonsHTML") > -1);
+  assert.ok(carFn.indexOf("finalVerdictHTML") > carFn.indexOf("directionButtonsHTML"));
+  assert.ok(carFn.indexOf("printReport") > carFn.indexOf("finalVerdictHTML"));
+  assert.match(app, /Итоговая оценка автомобиля/);
+  assert.match(app, /Выберите раздел/);
+});
+
+test("scheme shows recognizable top and side car views", () => {
+  const top = carTopSvg({ geometryCritical: true });
+  const side = carSideSvg({ geometryCritical: false });
+  assert.match(top, /Вид автомобиля сверху/);
+  assert.match(side, /Вид автомобиля сбоку/);
+  for (const slug of ["hodovaya", "body", "engine", "electric", "interior", "geometry", "wheels"]) {
+    assert.match(top, new RegExp(`data-select-dir="${slug}"`));
+    assert.match(side, new RegExp(`data-select-dir="${slug}"`));
+  }
+  assert.match(top, /scheme-crit-mark/);
+  assert.equal(side.includes("scheme-crit-mark"), false);
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(app, /carTopSvg/);
+  assert.match(app, /carSideSvg/);
+  assert.match(app, /scheme-view-title">Вид сверху/);
+  assert.match(app, /scheme-view-title">Вид сбоку/);
+});
+
+test("service worker prefers the network so a refresh gets the latest shell", () => {
+  const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
+  assert.match(sw, /skipWaiting/);
+  assert.match(sw, /clients\.claim/);
+  assert.match(sw, /access\.js\?v=20261108f/);
+  assert.match(sw, /scheme\.js\?v=20261108f/);
+  const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
+  assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
+  assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
 });

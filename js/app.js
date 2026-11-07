@@ -1,11 +1,13 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108e";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108e";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108e";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108e";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore } from "./summary.js?v=20261108e";
-import { directionThumb } from "./icons.js?v=20261108e";
-import { folderKey } from "./folder.js?v=20261108e";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108e";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108f";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108f";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108f";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108f";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108f";
+import { directionThumb } from "./icons.js?v=20261108f";
+import { folderKey } from "./folder.js?v=20261108f";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108f";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108f";
+import { carTopSvg, carSideSvg } from "./scheme.js?v=20261108f";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -15,8 +17,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108e";
-import { ASSET_VERSION } from "./version.js?v=20261108e";
+} from "./media.js?v=20261108f";
+import { ASSET_VERSION } from "./version.js?v=20261108f";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -32,7 +34,7 @@ const BRAND_TAGLINE = "Состояние авто — без тёмных пя�
 const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь.";
 
 const MASTER_FILTER_NOTE =
-  "В режиме мастера — только назначенные разделы; посмотреть все в режиме покупателя (опубликованный отчёт)/администратора";
+  "В этом демо видны все семь разделов. Редактировать можно только назначенные вам. Остальные открываются по опубликованному отчёту либо с пометкой «Раздел ещё не опубликован».";
 
 let sheetDir = null;
 let sheetNode = null;
@@ -81,12 +83,16 @@ function parseRoute() {
   return parseRouteFromHash(location.hash);
 }
 
-function canEdit() {
-  return state.role === "admin" || state.role === "master";
+function accessFor(carState, slug) {
+  return directionAccess(state.role, state.masterId, carState, slug);
 }
 
-function canSeeInternal() {
-  return state.role === "admin" || state.role === "master";
+function canEditDir(carState, slug) {
+  return canEditDirection(state.role, state.masterId, carState, slug);
+}
+
+function canSeeInternalDir(carState, slug) {
+  return canSeeInternalFor(state.role, state.masterId, carState, slug);
 }
 
 function roleLabel() {
@@ -126,17 +132,16 @@ function scoresFor(carId) {
 }
 
 function overviewFor(carId) {
-  const carState = state.cars[carId];
-  if (!carState) return { scores: blankScores(), unpublished: true };
-  if (state.role === "buyer" && carState.status !== "published") {
-    return { scores: blankScores(), unpublished: true };
-  }
-  return { scores: scoresFor(carId) || blankScores(), unpublished: false };
+  return authorizedOverview(state.role, state.masterId, state.cars[carId]);
 }
 
-function visibleDirections(carState) {
-  const list = state.role !== "master" ? DIRECTIONS : DIRECTIONS.filter((direction) => carState.assignments[direction.slug]?.masterId === state.masterId);
-  return orderedDirections(list);
+function summaryForDirection(carId, direction) {
+  const view = authorizedDirectionScore(state.role, state.masterId, state.cars[carId], direction.slug);
+  const summary = summarizeDirection(view.dirScore, { unpublished: view.unpublished });
+  if (view.unpublished) {
+    return { ...summary, label: "Раздел ещё не опубликован" };
+  }
+  return summary;
 }
 
 function whatsappHref(car) {
@@ -177,7 +182,7 @@ function header() {
     </div>
     <nav>
       <a href="#/">Все автомобили</a>
-      <button type="button" class="mode-toggle" id="modeToggle" aria-haspopup="dialog">Режим работы (демо): ${escapeHtml(roleLabel())}</button>
+      <button type="button" class="mode-toggle" id="modeToggle" aria-haspopup="dialog">Демо-режим: ${escapeHtml(roleLabel())}</button>
       <button type="button" class="btn ghost header-action" id="sharePage">Поделиться</button>
       <button type="button" class="btn ghost header-action" id="installApp">Установить на телефон</button>
     </nav>
@@ -233,14 +238,10 @@ function summaryFields(summary) {
     ${summary.hasCritical ? `<p class="dir-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Есть критичные замечания</span></p>` : ""}`;
 }
 
-function severityClass(summary) {
-  return `kind-${summary.kind}${summary.hasCritical ? " has-critical" : ""}`;
-}
-
 function overallHero(carId) {
   const { scores, unpublished } = overviewFor(carId);
   const summary = summarizeOverall(scores, { unpublished });
-  return `<div class="score-hero ${severityClass(summary)}">
+  return `<div class="score-hero score-hero-mini ${severityClass(summary)}" data-overall-hero>
     <strong>${escapeHtml(summary.scoreText)}</strong>
     <div>
       <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span><span>${escapeHtml(summary.label)}</span></p>
@@ -254,12 +255,12 @@ function highlightsHTML(carId) {
   const carState = state.cars[carId];
   const { scores, unpublished } = overviewFor(carId);
   if (unpublished) return "";
-  const dirs = visibleDirections(carState);
-  const critical = scores.criticalFaults || [];
+  const dirs = visibleDirections();
+  const critical = (scores.criticalFaults || []).filter((item) => accessFor(carState, item.directionId) !== "blocked");
   const attention = [];
   const good = [];
   for (const direction of dirs) {
-    const summary = summarizeDirection(scores.directionScores.find((item) => item.id === direction.slug));
+    const summary = summaryForDirection(carId, direction);
     if (summary.hasCritical || summary.kind === "repair" || summary.kind === "notes") {
       attention.push({ name: directionTitle(direction.slug, direction.name), summary });
     } else if (summary.kind === "good") {
@@ -287,13 +288,14 @@ function highlightsHTML(carId) {
 function directionNotesHTML(carId, slug, editable) {
   ensureCarShape(state.cars[carId]);
   const notes = state.cars[carId].directionNotes[slug];
+  const seeInternal = canSeeInternalDir(state.cars[carId], slug);
   if (editable) {
     return `<section class="dir-notes">
       <label>Описание направления
         <textarea data-dir-note="publicComment" data-car="${carId}" data-dir="${slug}">${escapeHtml(notes.publicComment)}</textarea>
       </label>
       ${
-        canSeeInternal()
+        seeInternal
           ? `<label>Внутренний комментарий направления (скрыт от покупателя)
         <textarea data-dir-note="internalComment" data-car="${carId}" data-dir="${slug}">${escapeHtml(notes.internalComment)}</textarea>
       </label>`
@@ -304,21 +306,21 @@ function directionNotesHTML(carId, slug, editable) {
   return `<section class="dir-notes">
     <h3>Описание направления</h3>
     <p>${notes.publicComment ? escapeHtml(notes.publicComment) : "Описание направления пока не заполнено."}</p>
-    ${canSeeInternal() && notes.internalComment ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(notes.internalComment)}</div>` : ""}
+    ${seeInternal && notes.internalComment ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(notes.internalComment)}</div>` : ""}
   </section>`;
 }
 
-function emptyPhotoText() {
-  return canEdit() ? "Добавьте фото состояния узла" : "Материалы пока не добавлены";
+function emptyPhotoText(editable) {
+  return editable ? "Добавьте фото состояния узла" : "Материалы пока не добавлены";
 }
 
-function emptyVideoText() {
-  return canEdit() ? "Добавьте видео состояния узла" : "Материалы пока не добавлены";
+function emptyVideoText(editable) {
+  return editable ? "Добавьте видео состояния узла" : "Материалы пока не добавлены";
 }
 
 function mediaPaneHTML(carId, slug, kind) {
   const key = folderKey(carId, slug);
-  const editable = canEdit();
+  const editable = canEditDir(state.cars[carId], slug);
   const photoUpload = editable
     ? `<label class="btn ghost file-btn">Добавить фото
         <input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" data-media-upload="photo" data-car="${carId}" data-dir="${slug}">
@@ -331,11 +333,11 @@ function mediaPaneHTML(carId, slug, kind) {
     : "";
   return `<section class="media-folders" data-media-folder="${escapeHtml(key)}" data-car="${carId}" data-dir="${slug}">
     <div data-photo-panel ${kind === "photo" ? "" : "hidden"}>
-      <div class="photo-gallery" data-photo-gallery><p class="empty-media">${emptyPhotoText()}</p></div>
+      <div class="photo-gallery" data-photo-gallery><p class="empty-media">${emptyPhotoText(editable)}</p></div>
       ${photoUpload}
     </div>
     <div data-video-panel ${kind === "video" ? "" : "hidden"}>
-      <div class="video-gallery" data-video-gallery><p class="empty-media">${emptyVideoText()}</p></div>
+      <div class="video-gallery" data-video-gallery><p class="empty-media">${emptyVideoText(editable)}</p></div>
       ${videoUpload}
     </div>
     <p class="hint">${MEDIA_LIMITS_TEXT}</p>
@@ -371,11 +373,11 @@ function nodeListHTML(carId, direction) {
   </div>`;
 }
 
-function nodeEditorHTML(direction, checkpoint, result) {
+function nodeEditorHTML(direction, checkpoint, result, seeInternal) {
   const scoreOptions = [`<option value="" ${result.score == null ? "selected" : ""}>не проверено</option>`]
     .concat(Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${result.score === n ? "selected" : ""}>${n}</option>`))
     .join("");
-  const internal = canSeeInternal()
+  const internal = seeInternal
     ? `<label>Внутренний комментарий (скрыт от покупателя)
         <textarea data-act="internal" data-dir="${direction.slug}" data-cp="${checkpoint.slug}">${escapeHtml(result.internalComment || "")}</textarea>
       </label>`
@@ -392,9 +394,9 @@ function nodeEditorHTML(direction, checkpoint, result) {
     ${internal}`;
 }
 
-function nodeReadHTML(checkpoint, result) {
+function nodeReadHTML(checkpoint, result, seeInternal) {
   const internal =
-    canSeeInternal() && result.internalComment
+    seeInternal && result.internalComment
       ? `<div class="internal">Внутреннее (не для покупателя): ${escapeHtml(result.internalComment)}</div>`
       : "";
   return `<p><strong>Оценка:</strong> ${nodeScoreLabel(result.score)}</p>
@@ -404,11 +406,14 @@ function nodeReadHTML(checkpoint, result) {
 }
 
 function nodeDetailHTML(carId, direction, checkpoint, result) {
+  const carState = state.cars[carId];
+  const editable = canEditDir(carState, direction.slug);
+  const seeInternal = canSeeInternalDir(carState, direction.slug);
   return `<div class="node-detail">
     <button type="button" class="text-btn" data-back-nodes>Назад к списку</button>
     <h3>${escapeHtml(checkpoint.name)} ${checkpoint.isCritical ? `<span class="crit">критичный</span>` : ""}</h3>
     <p class="node-score" data-node-score="${checkpoint.slug}">${nodeScoreLabel(result.score)}</p>
-    ${canEdit() ? nodeEditorHTML(direction, checkpoint, result) : nodeReadHTML(checkpoint, result)}
+    ${editable ? nodeEditorHTML(direction, checkpoint, result, seeInternal) : nodeReadHTML(checkpoint, result, seeInternal)}
   </div>`;
 }
 
@@ -416,11 +421,17 @@ function printAllHTML(carId, dirs) {
   const carState = state.cars[carId];
   return `<div class="print-all">${dirs
     .map((direction) => {
+      const title = directionTitle(direction.slug, direction.name);
+      const access = accessFor(carState, direction.slug);
+      if (access === "blocked") {
+        return `<section><h3>${title}</h3><p>Раздел ещё не опубликован.</p></section>`;
+      }
+      const seeInternal = canSeeInternalDir(carState, direction.slug);
       const items = direction.checkpoints
         .map((checkpoint) => {
           const result = carState.results[direction.slug][checkpoint.slug];
           const internal =
-            canSeeInternal() && result.internalComment
+            seeInternal && result.internalComment
               ? ` Внутреннее: ${escapeHtml(result.internalComment)}`
               : "";
           return `<li>${checkpoint.name} — ${nodeScoreLabel(result.score)} — ${escapeHtml(result.versionNote || "—")}. ${escapeHtml(result.publicComment || "—")}${internal}</li>`;
@@ -428,34 +439,41 @@ function printAllHTML(carId, dirs) {
         .join("");
       ensureCarShape(carState);
       const note = carState.directionNotes[direction.slug]?.publicComment;
-      return `<section><h3>${directionTitle(direction.slug, direction.name)}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul></section>`;
+      return `<section><h3>${title}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul></section>`;
     })
     .join("")}</div>`;
 }
 
-function carSchemeHTML(dirs, scores, unpublished) {
-  const labels = dirs
+function schemeLabelsHTML(dirs, carId) {
+  return dirs
     .map((direction) => {
-      const summary = summarizeDirection(scores.directionScores.find((item) => item.id === direction.slug), { unpublished });
+      const summary = summaryForDirection(carId, direction);
       const title = directionTitle(direction.slug, direction.name);
       return `<li><button type="button" class="scheme-hot ${severityClass(summary)}" data-select-dir="${direction.slug}" aria-haspopup="dialog" aria-controls="categoryDialog" aria-expanded="false">${escapeHtml(title)}</button></li>`;
     })
     .join("");
+}
+
+function carSchemeHTML(carId, dirs) {
+  const geometryDir = dirs.find((item) => item.slug === "geometry") || { slug: "geometry", checkpoints: [] };
+  const geometryCritical = Boolean(summaryForDirection(carId, geometryDir).hasCritical);
+  const zoneClassMap = Object.fromEntries(
+    dirs.map((direction) => [direction.slug, direction.slug === "geometry" && geometryCritical ? "has-critical" : ""]),
+  );
   return `<figure class="car-scheme">
     <figcaption>Схема автомобиля</figcaption>
-    <svg class="scheme-svg" viewBox="0 0 560 240" role="img" aria-label="Контур автомобиля сверху, без отметок повреждений">
-      <rect class="scheme-wheel" x="150" y="18" width="78" height="26" rx="10"/>
-      <rect class="scheme-wheel" x="150" y="196" width="78" height="26" rx="10"/>
-      <rect class="scheme-wheel" x="340" y="18" width="78" height="26" rx="10"/>
-      <rect class="scheme-wheel" x="340" y="196" width="78" height="26" rx="10"/>
-      <path class="scheme-body" d="M92 58 h300 q48 0 78 28 l42 22 v24 l-42 22 q-30 28 -78 28 H92 q-36 0 -52 -30 V88 q16 -30 52 -30 z"/>
-      <rect class="scheme-hood" x="390" y="78" width="88" height="84" rx="12"/>
-      <rect class="scheme-cabin" x="210" y="78" width="160" height="84" rx="14"/>
-      <path class="scheme-glass" d="M372 86 v68 l28 -16 v-36 z"/>
-      <line class="scheme-spine" x1="108" y1="120" x2="452" y2="120"/>
-    </svg>
-    <ul class="scheme-labels">${labels}</ul>
-    <p class="hint">Метки показывают разделы осмотра, а не точные места повреждений.</p>
+    <div class="scheme-views">
+      <section class="scheme-panel" data-scheme-panel="top">
+        <h3 class="scheme-view-title">Вид сверху</h3>
+        ${carTopSvg({ zoneClassMap, geometryCritical })}
+      </section>
+      <section class="scheme-panel" data-scheme-panel="side">
+        <h3 class="scheme-view-title">Вид сбоку</h3>
+        ${carSideSvg({ zoneClassMap, geometryCritical })}
+      </section>
+    </div>
+    ${geometryCritical ? `<p class="scheme-crit-note">На схеме отмечено критичное замечание в разделе «Геометрия / Лонжероны» — по данным осмотра, не выдуманная метка повреждения.</p>` : ""}
+    <p class="hint">Нажмите на часть машины — откроется тот же раздел, что и кнопка ниже. Это схема, а не карта царапин.</p>
   </figure>`;
 }
 
@@ -467,24 +485,59 @@ function directionButtonHTML(direction, summary) {
       <h3>${escapeHtml(title)}</h3>
       <span data-summary-body="${direction.slug}">${summaryFields(summary)}</span>
     </span>
+    <span class="dir-chevron" aria-hidden="true">›</span>
   </button>`;
 }
 
-function directionButtonsHTML(dirs, scores, unpublished) {
-  if (!dirs.length) return `<p>В этой симуляции выбранному демо-мастеру ничего не назначено.</p>`;
-  const items = dirs
-    .map((direction) => {
-      const dirScore = scores.directionScores.find((item) => item.id === direction.slug);
-      const summary = summarizeDirection(dirScore, { unpublished });
-      return directionButtonHTML(direction, summary);
-    })
-    .join("");
+function directionButtonsHTML(carId, dirs) {
+  const items = dirs.map((direction) => directionButtonHTML(direction, summaryForDirection(carId, direction))).join("");
   return `<div class="dir-buttons">${items}</div>`;
 }
 
 function masterFilterNote() {
   if (state.role !== "master") return "";
   return `<p class="hint master-note" role="note">${MASTER_FILTER_NOTE}</p>`;
+}
+
+
+function finalVerdictHTML(carId) {
+  const carState = state.cars[carId];
+  const overview = overviewFor(carId);
+  const progress = inspectionProgress(overview.scores, { unpublished: overview.unpublished });
+  const conclusion = authorizedConclusion(state.role, carState, overview.source);
+  const total = progress.total || 0;
+  const checked = progress.checked || 0;
+  const pct = total ? Math.round((checked / total) * 100) : 0;
+  const faults = overview.unpublished ? [] : overview.scores.criticalFaults || [];
+  let critLine = "";
+  if (!overview.unpublished && faults.length) {
+    critLine = `<p class="verdict-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Критичные замечания: ${faults.map((item) => `${escapeHtml(item.name)}: ${item.score}/10`).join("; ")}</span></p>`;
+  } else if (!overview.unpublished && checked > 0) {
+    critLine = `<p class="verdict-ok">В проверенных критичных узлах отдельных предупреждений нет.</p>`;
+  }
+  let hint = "";
+  if (progress.key === "preliminary") {
+    hint = `<p class="hint">Оценка предварительная: проверены не все пункты. Это не гарантия будущего состояния.</p>`;
+  } else if (progress.key === "complete") {
+    hint = `<p class="hint">Осмотр завершён. Это не гарантия будущего состояния автомобиля.</p>`;
+  }
+  const condition =
+    progress.key === "unpublished" || progress.key === "none"
+      ? ""
+      : `<p class="cond cond-${progress.kind}"><span class="cond-mark" aria-hidden="true">${condMark(progress.kind)}</span><span>${escapeHtml(progress.label)}</span></p>`;
+  return `<section class="final-verdict ${severityClass(progress)}" data-final-verdict id="finalVerdict">
+    <h2>Итоговая оценка автомобиля</h2>
+    <p class="verdict-stage">${escapeHtml(progress.completionLabel)}</p>
+    <p class="verdict-score">${escapeHtml(progress.scoreText)}</p>
+    ${condition}
+    <div class="verdict-progress">
+      <div class="verdict-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${overview.unpublished ? 0 : checked}"><span style="width: ${overview.unpublished ? 0 : pct}%"></span></div>
+      <p>Проверено ${overview.unpublished ? "—" : checked} из ${total || "—"}</p>
+    </div>
+    ${critLine}
+    ${conclusion ? `<div class="verdict-conclusion"><h3>Заключение</h3><p>${escapeHtml(conclusion)}</p></div>` : ""}
+    ${hint}
+  </section>`;
 }
 
 function sheetDialogHTML() {
@@ -549,8 +602,8 @@ function renderHome() {
 function unpublishedBlock(car) {
   return `<section class="unavailable">
     <h2>Оценочный лист ещё не опубликован</h2>
-    <p>Когда осмотр будет готов, здесь появятся оценки, замечания, фото и видео «${escapeHtml(car.make)} ${escapeHtml(car.model)}».</p>
-    <p class="hint">Чтобы посмотреть готовый пример, вернитесь в каталог и откройте опубликованный автомобиль. Режим мастера в меню «Режим работы (демо)» показывает учебное заполнение — это не настоящий доступ.</p>
+    <p>Когда осмотр «${escapeHtml(car.make)} ${escapeHtml(car.model)}» будет опубликован, здесь появятся оценки, замечания, фото и видео.</p>
+    <p class="hint">Разделы уже можно открыть. Подробности появятся после публикации.</p>
   </section>`;
 }
 
@@ -558,12 +611,9 @@ function renderCar(id, route = parseRoute()) {
   const car = carMeta(id);
   const carState = state.cars[id];
   if (!car || !carState) return `${header()}<main class="wrap"><h1>Образец не найден</h1></main>`;
-  const { scores, unpublished } = overviewFor(id);
-  const dirs = visibleDirections(carState);
-  const conclusion =
-    state.role === "buyer" && carState.publishedSnapshot
-      ? carState.publishedSnapshot.conclusion
-      : carState.conclusion || carState.publishedSnapshot?.conclusion || "";
+  const overview = overviewFor(id);
+  const unpublished = overview.unpublished;
+  const dirs = visibleDirections();
   return `${header()}
     <main class="wrap report">
       <nav class="crumb" aria-label="Навигация">
@@ -576,7 +626,6 @@ function renderCar(id, route = parseRoute()) {
       <p class="lead motto">${BRAND_TAGLINE}</p>
       <section class="sheet-top">
         ${carPhoto(car, "hero-visual photo-auto", "Фото авто · учебная иллюстрация, не фото реального осмотра")}
-        ${unpublished ? "" : carSchemeHTML(dirs, scores, unpublished)}
         <div class="sheet-facts">
           <dl class="facts">
             <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
@@ -587,17 +636,19 @@ function renderCar(id, route = parseRoute()) {
           </dl>
           ${overallHero(id)}
         </div>
+        ${carSchemeHTML(id, dirs)}
       </section>
       ${unpublished ? unpublishedBlock(car) : ""}
       ${unpublished ? "" : `<p class="formula">${FORMULA_DISCLAIMER}</p>`}
-      ${unpublished ? "" : highlightsHTML(id)}
-      ${!unpublished && conclusion ? `<section class="highlights"><h2>Заключение</h2><p>${escapeHtml(conclusion)}</p></section>` : ""}
-      ${unpublished ? "" : conditionLegend()}
-      ${unpublished ? "" : `<h2>Разделы диагностики</h2><p class="lead">Семь отдельных кнопок: сначала ходовая часть, затем кузов, двигатель, электрика и остальные разделы. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>`}
-      ${unpublished ? "" : masterFilterNote()}
-      ${unpublished ? "" : directionButtonsHTML(dirs, scores, unpublished)}
-      ${unpublished ? "" : `<p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>`}
-      ${unpublished ? "" : printAllHTML(id, dirs)}
+      ${highlightsHTML(id)}
+      ${conditionLegend()}
+      <h2>Разделы диагностики</h2>
+      <p class="lead">Выберите раздел. Семь отдельных кнопок: сначала ходовая часть, затем кузов, двигатель, электрика и остальные разделы. Нажмите кнопку — откроется окно с оценками и фото, без длинной простыни.</p>
+      ${masterFilterNote()}
+      ${directionButtonsHTML(id, dirs)}
+      ${finalVerdictHTML(id)}
+      <p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>
+      ${printAllHTML(id, dirs)}
       ${renderWhatsApp(car)}
       ${sheetDialogHTML()}
     </main>`;
@@ -663,7 +714,7 @@ function render() {
   bind();
   if (isCarRoute(route) && route.id && route.dir) {
     const carState = state.cars[route.id];
-    const allowed = carState ? visibleDirections(carState).some((item) => item.slug === route.dir) : false;
+    const allowed = carState ? visibleDirections().some((item) => item.slug === route.dir) : false;
     if (allowed) openCategoryDialog(route.dir, { updateHash: false });
   }
 }
@@ -685,10 +736,9 @@ function applySeverityClass(el, summary) {
 function patchLiveSummaries(carId) {
   const carState = state.cars[carId];
   if (!carState) return;
-  const scores = liveScoresForCar(carState);
-  const dirs = visibleDirections(carState);
+  const dirs = visibleDirections();
   for (const direction of dirs) {
-    const summary = summarizeDirection(scores.directionScores.find((item) => item.id === direction.slug));
+    const summary = summaryForDirection(carId, direction);
     document.querySelectorAll(`[data-summary-body="${direction.slug}"]`).forEach((holder) => {
       holder.innerHTML = summaryFields(summary);
     });
@@ -697,6 +747,18 @@ function patchLiveSummaries(carId) {
       const dialogSummary = document.getElementById("catDialogSummary");
       if (dialogSummary) dialogSummary.innerHTML = summaryFields(summary);
     }
+  }
+  const hero = document.querySelector("[data-overall-hero]");
+  if (hero) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = overallHero(carId);
+    hero.replaceWith(wrap.firstElementChild);
+  }
+  const verdict = document.querySelector("[data-final-verdict]");
+  if (verdict) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = finalVerdictHTML(carId);
+    verdict.replaceWith(wrap.firstElementChild);
   }
 }
 
@@ -712,13 +774,15 @@ function fillSheetBody(carId, direction) {
   const body = document.getElementById("catDialogBody");
   if (!body) return;
   const carState = state.cars[carId];
-  if (state.role === "buyer" && carState.status !== "published") {
-    body.innerHTML = "<p>Оценочный лист ещё не опубликован. Описание, оценки, фото и видео этого направления скрыты.</p>";
+  const access = accessFor(carState, direction.slug);
+  const editable = access === "edit";
+  if (access === "blocked") {
+    body.innerHTML = `<p class="sheet-blocked">${escapeHtml(unpublishedSectionMessage(state.role, state.masterId, carState, direction.slug))}</p>`;
     return;
   }
   if (sheetPane === "notes") {
-    body.innerHTML = `${directionNotesHTML(carId, direction.slug, canEdit())}
-      ${state.role === "master" && canEdit() ? `<button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button>` : ""}`;
+    body.innerHTML = `${directionNotesHTML(carId, direction.slug, editable)}
+      ${state.role === "master" && editable ? `<button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button>` : ""}`;
     bindFieldRoot(body);
     return;
   }
@@ -745,7 +809,7 @@ function fillSheetBody(carId, direction) {
   }
   body.innerHTML = `<p class="hint">Выберите пункт проверки — ${direction.checkpoints.length} узлов.</p>
     ${nodeListHTML(carId, direction)}
-    ${state.role === "master" && canEdit() ? `<p><button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button></p>` : ""}`;
+    ${state.role === "master" && editable ? `<p><button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button></p>` : ""}`;
   body.querySelectorAll("[data-select-node]").forEach((button) => {
     button.addEventListener("click", () => {
       sheetNode = button.getAttribute("data-select-node");
@@ -758,11 +822,8 @@ function fillSheetBody(carId, direction) {
 function fillSheet(carId, slug) {
   const direction = DIRECTIONS.find((item) => item.slug === slug);
   if (!direction) return;
-  const { scores, unpublished } = overviewFor(carId);
-  const summary = summarizeDirection(
-    scores.directionScores.find((item) => item.id === slug),
-    { unpublished },
-  );
+  const carState = state.cars[carId];
+  const summary = summaryForDirection(carId, direction);
   const title = document.getElementById("catDialogTitle");
   const summaryBox = document.getElementById("catDialogSummary");
   const thumb = document.getElementById("catDialogThumb");
@@ -770,6 +831,11 @@ function fillSheet(carId, slug) {
   if (title) title.textContent = directionTitle(slug, direction.name);
   if (summaryBox) summaryBox.innerHTML = summaryFields(summary);
   if (thumb) thumb.innerHTML = directionThumb(slug);
+  if (accessFor(carState, slug) === "blocked") {
+    if (tabs) tabs.innerHTML = "";
+    fillSheetBody(carId, direction);
+    return;
+  }
   if (tabs) tabs.innerHTML = sheetTabsHTML(direction, sheetPane);
   fillSheetBody(carId, direction);
   tabs?.querySelectorAll("[data-sheet-tab]").forEach((tab) => {
@@ -787,7 +853,7 @@ function openCategoryDialog(slug, { updateHash = true, trigger = null } = {}) {
   if (!carId || !slug) return;
   const carState = state.cars[carId];
   if (!carState) return;
-  if (!visibleDirections(carState).some((item) => item.slug === slug)) return;
+  if (!visibleDirections().some((item) => item.slug === slug)) return;
   if (sheetDir && sheetDir !== slug) revokeFolderObjectUrls(carId, sheetDir);
   sheetDir = slug;
   sheetNode = null;
@@ -830,15 +896,27 @@ function bindSheetDialog() {
     button.addEventListener("click", () => dialog.close());
   });
   document.querySelectorAll("[data-select-dir]").forEach((button) => {
-    button.addEventListener("click", () => {
-      openCategoryDialog(button.getAttribute("data-select-dir"), { trigger: button });
-    });
+    const open = () => {
+      const slug = button.getAttribute("data-select-dir");
+      const trigger = button.closest(".dir-btn, .scheme-hot") || document.querySelector(`.dir-btn[data-select-dir="${slug}"]`) || button;
+      openCategoryDialog(slug, { trigger });
+    };
+    button.addEventListener("click", open);
+    if (button.tagName !== "BUTTON") {
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    }
   });
 }
 
 async function hydrateMedia(carId, slug, root = document) {
   const folder = root.matches?.("[data-media-folder]") ? root : root.querySelector("[data-media-folder]");
   if (!folder) return;
+  const editable = canEditDir(state.cars[carId], slug);
   const status = folder.querySelector("[data-media-status]");
   try {
     const items = await listFolderMedia(carId, slug);
@@ -862,11 +940,11 @@ async function hydrateMedia(carId, slug, root = document) {
             <img src="${url}" alt="${escapeHtml(item.name)}">
           </button>
           <figcaption>${escapeHtml(item.name)}</figcaption>
-          ${canEdit() ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
+          ${editable ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
         </figure>`;
             })
             .join("")
-        : `<p class="empty-media">${emptyPhotoText()}</p>`;
+        : `<p class="empty-media">${emptyPhotoText(editable)}</p>`;
     }
     const videoBox = folder.querySelector("[data-video-gallery]");
     if (videoBox) {
@@ -877,11 +955,11 @@ async function hydrateMedia(carId, slug, root = document) {
               return `<figure class="video-item">
           <video controls preload="metadata" src="${url}"></video>
           <figcaption>${escapeHtml(item.name)}</figcaption>
-          ${canEdit() ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
+          ${editable ? `<button type="button" class="text-btn" data-del-media="${item.id}">Удалить</button>` : ""}
         </figure>`;
             })
             .join("")
-        : `<p class="empty-media">${emptyVideoText()}</p>`;
+        : `<p class="empty-media">${emptyVideoText(editable)}</p>`;
     }
     const tab = folder.querySelector('[data-media-tab][aria-selected="true"]');
     if (tab) {
@@ -911,6 +989,7 @@ function bindMediaSection(root = document) {
       if (!input) return;
       const carId = input.getAttribute("data-car");
       const slug = input.getAttribute("data-dir");
+      if (!canEditDir(state.cars[carId], slug)) return;
       const kind = input.getAttribute("data-media-upload");
       const files = [...(input.files || [])];
       input.value = "";
@@ -934,6 +1013,7 @@ function bindMediaSection(root = document) {
       if (del) {
         const carId = folder.getAttribute("data-car");
         const slug = folder.getAttribute("data-dir");
+        if (!canEditDir(state.cars[carId], slug)) return;
         const result = await deleteFolderMedia(del.getAttribute("data-del-media"), carId, slug);
         const status = folder.querySelector("[data-media-status]");
         if (!result.ok && status) status.textContent = result.error;
@@ -968,6 +1048,7 @@ function bindFieldRoot(root) {
       const cp = el.getAttribute("data-cp");
       const act = el.getAttribute("data-act");
       const carId = parseRoute().id;
+      if (!canEditDir(state.cars[carId], dir)) return;
       const result = state.cars[carId].results[dir][cp];
       if (act === "score") result.score = el.value === "" ? null : Number(el.value);
       if (act === "version") result.versionNote = el.value;
@@ -993,6 +1074,7 @@ function bindFieldRoot(root) {
       const carId = el.getAttribute("data-car");
       const dir = el.getAttribute("data-dir");
       const field = el.getAttribute("data-dir-note");
+      if (!canEditDir(state.cars[carId], dir)) return;
       ensureCarShape(state.cars[carId]);
       state.cars[carId].directionNotes[dir][field] = el.value;
       scheduleSave();
@@ -1002,6 +1084,7 @@ function bindFieldRoot(root) {
     button.addEventListener("click", () => {
       const dir = button.getAttribute("data-submit");
       const carState = state.cars[parseRoute().id];
+      if (!canEditDir(carState, dir)) return;
       carState.assignments[dir].status = "submitted";
       carState.status = "in_review";
       persist();
@@ -1124,6 +1207,20 @@ if (typeof window !== "undefined") {
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     refreshInstallButton();
+  });
+}
+
+function bindSchemeTabs() {
+  const tabs = [...document.querySelectorAll("[data-scheme-view]")];
+  if (!tabs.length) return;
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const name = tab.getAttribute("data-scheme-view");
+      tabs.forEach((item) => item.setAttribute("aria-selected", item === tab ? "true" : "false"));
+      document.querySelectorAll("[data-scheme-panel]").forEach((panel) => {
+        panel.classList.toggle("is-active", panel.getAttribute("data-scheme-panel") === name);
+      });
+    });
   });
 }
 
