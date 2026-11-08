@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108j/);
-  assert.match(sw, /scheme\.js\?v=20261108j/);
+  assert.match(sw, /access\.js\?v=20261108k/);
+  assert.match(sw, /scheme\.js\?v=20261108k/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,8 +824,8 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108j/);
-  assert.match(sw, /diagrams\.js\?v=20261108j/);
+  assert.match(sw, /defects\.js\?v=20261108k/);
+  assert.match(sw, /diagrams\.js\?v=20261108k/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
 
@@ -835,7 +835,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(html, /css\/comic\.css\?v=20261108j/);
+  assert.match(html, /css\/comic\.css\?v=20261108k/);
   assert.match(comic, /@font-face/);
   assert.match(comic, /font-family:\s*"Russo One"/);
   assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
@@ -844,7 +844,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
   assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
   assert.match(comic, /U\+0400/);
-  assert.match(sw, /css\/comic\.css\?v=20261108j/);
+  assert.match(sw, /css\/comic\.css\?v=20261108k/);
   assert.match(sw, /fonts\/russo-one\.woff2/);
   assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
   assert.match(sw, /fonts\/manrope-variable\.woff2/);
@@ -884,4 +884,18 @@ test("annotation stage is not skewed or rotated", () => {
       assert.match(rule, /transform:\s*none/);
     }
   }
+});
+
+test("header shows the buy-right line under Проверенные авто!", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const comic = readFileSync(fileURLToPath(new URL("../css/comic.css", import.meta.url)), "utf8");
+  assert.match(app, /const BRAND_HOOK = "Покупай автомобиль правильно!"/);
+  const headerFn = app.slice(app.indexOf("function header"), app.indexOf("function statusIconSVG"));
+  const sub = headerFn.indexOf('class="brand-sub">${BRAND_SUBLINE}');
+  const hook = headerFn.indexOf('class="brand-hook">${BRAND_HOOK}');
+  assert.ok(sub !== -1 && hook > sub, "hook must sit immediately under the brand subline in the shared header");
+  assert.equal(headerFn.includes("Покупай автомобиль правильно!") || hook !== -1, true);
+  assert.match(css, /\.brand-hook\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+  assert.match(comic, /\.brand-hook\s*\{[^}]*overflow-wrap:\s*anywhere/s);
 });

@@ -81,7 +81,7 @@ h2 {
   line-height: 1.2;
 }
 
-.tag, .brand-sub, .speech-bubble, .lead.motto, .comic-sticker, .chapter-kicker, .comic-cta {
+.tag, .brand-sub, .brand-hook, .speech-bubble, .lead.motto, .comic-sticker, .chapter-kicker, .comic-cta {
   font-family: "Balsamiq Sans", "Manrope", sans-serif;
   font-weight: 700;
 }
@@ -112,6 +112,15 @@ h2 {
 .brand-sub {
   color: var(--comic-cyan);
   margin: 0.25rem 0 0;
+}
+
+.brand-hook {
+  margin: 0.28rem 0 0;
+  max-width: min(100%, 20rem);
+  overflow-wrap: anywhere;
+  color: var(--comic-yellow);
+  font-size: 1.05rem;
+  line-height: 1.3;
 }
 
 nav a {

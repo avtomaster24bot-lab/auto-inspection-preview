@@ -1,14 +1,14 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108j";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108j";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108j";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108j";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108j";
-import { directionThumb } from "./icons.js?v=20261108j";
-import { folderKey } from "./folder.js?v=20261108j";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108j";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108j";
-import { schemeForCar } from "./scheme.js?v=20261108j";
-import { diagramsForDirection } from "./diagrams.js?v=20261108j";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108k";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108k";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108k";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108k";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108k";
+import { directionThumb } from "./icons.js?v=20261108k";
+import { folderKey } from "./folder.js?v=20261108k";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108k";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108k";
+import { schemeForCar } from "./scheme.js?v=20261108k";
+import { diagramsForDirection } from "./diagrams.js?v=20261108k";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -22,7 +22,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108j";
+} from "./defects.js?v=20261108k";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -32,8 +32,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108j";
-import { ASSET_VERSION } from "./version.js?v=20261108j";
+} from "./media.js?v=20261108k";
+import { ASSET_VERSION } from "./version.js?v=20261108k";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -44,6 +44,7 @@ const STATUS_LABEL = {
 
 const BRAND_NAME = "Авто Лидер";
 const BRAND_SUBLINE = "Проверенные авто!";
+const BRAND_HOOK = "Покупай автомобиль правильно!";
 const BRAND_FULL = "Авто Лидер — Проверенные авто!";
 const BRAND_TAGLINE = "Состояние авто — без тёмных пятен";
 const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь.";
@@ -211,6 +212,7 @@ function header() {
     <div class="brand">
       <a href="#/" class="logo">${BRAND_NAME}</a>
       <p class="brand-sub">${BRAND_SUBLINE}</p>
+      <p class="brand-hook">${BRAND_HOOK}</p>
     </div>
     <nav>
       <a href="#/">Все автомобили</a>
