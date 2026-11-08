@@ -1,14 +1,14 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108i";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108i";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108i";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108i";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108i";
-import { directionThumb } from "./icons.js?v=20261108i";
-import { folderKey } from "./folder.js?v=20261108i";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108i";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108i";
-import { schemeForCar } from "./scheme.js?v=20261108i";
-import { diagramsForDirection } from "./diagrams.js?v=20261108i";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108j";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108j";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108j";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108j";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108j";
+import { directionThumb } from "./icons.js?v=20261108j";
+import { folderKey } from "./folder.js?v=20261108j";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108j";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108j";
+import { schemeForCar } from "./scheme.js?v=20261108j";
+import { diagramsForDirection } from "./diagrams.js?v=20261108j";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -22,7 +22,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108i";
+} from "./defects.js?v=20261108j";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -32,8 +32,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108i";
-import { ASSET_VERSION } from "./version.js?v=20261108i";
+} from "./media.js?v=20261108j";
+import { ASSET_VERSION } from "./version.js?v=20261108j";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -47,6 +47,20 @@ const BRAND_SUBLINE = "Проверенные авто!";
 const BRAND_FULL = "Авто Лидер — Проверенные авто!";
 const BRAND_TAGLINE = "Состояние авто — без тёмных пятен";
 const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь.";
+
+function inspectionScope() {
+  const sections = orderedDirections().length;
+  const points = DIRECTIONS.reduce((sum, item) => sum + item.checkpoints.length, 0);
+  return { sections, points };
+}
+
+function chapterHead(id, title, index) {
+  return `<header class="chapter-head">
+    <span class="chapter-num" aria-hidden="true">${String(index).padStart(2, "0")}</span>
+    <h2 id="${id}">${escapeHtml(title)}</h2>
+  </header>`;
+}
+
 
 const MASTER_FILTER_NOTE =
   "В этом демо видны все семь разделов. Редактировать можно только назначенные вам. Остальные открываются по опубликованному отчёту либо с пометкой «Раздел ещё не опубликован».";
@@ -523,7 +537,9 @@ function carSchemeHTML(carId) {
 
 function directionButtonHTML(direction, summary) {
   const title = directionTitle(direction.slug, direction.name);
+  const order = orderedDirections().findIndex((item) => item.slug === direction.slug) + 1;
   return `<button type="button" class="dir-btn ${severityClass(summary)}" data-select-dir="${direction.slug}" aria-haspopup="dialog" aria-controls="categoryDialog" aria-expanded="false">
+    <span class="dir-spine" aria-hidden="true">${order}</span>
     ${directionThumb(direction.slug)}
     <span class="dir-btn-copy">
       <h3>${escapeHtml(title)}</h3>
@@ -943,7 +959,7 @@ function sheetTabsHTML(direction, pane) {
 
 function carCard(car) {
   const carState = state.cars[car.id];
-  return `<article class="card">
+  return `<article class="card comic-card">
     ${carPhoto(car, "car-visual")}
     <div class="card-body">
       <p class="tag">Папка автомобиля · ${car.label}</p>
@@ -961,12 +977,28 @@ function carCard(car) {
 }
 
 function renderHome() {
+  const cover = SAMPLE_CARS[0];
+  const { sections, points } = inspectionScope();
   return `${header()}
     <main class="wrap">
-      <h1>Выберите автомобиль</h1>
-      <p class="lead motto">${BRAND_TAGLINE}</p>
-      <p class="support">${BRAND_SUPPORT}</p>
-      <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
+      <section class="welcome-hero" aria-labelledby="welcomeTitle">
+        <div class="comic-cover">
+          ${carPhoto(cover, "comic-cover-art")}
+          <p class="comic-sticker comic-sticker-gold">${sections} разделов проверки</p>
+          <p class="comic-sticker comic-sticker-cyan">${points} пункт</p>
+        </div>
+        <div class="welcome-copy">
+          <p class="chapter-kicker">${escapeHtml(BRAND_FULL)}</p>
+          <h1 id="welcomeTitle">Выберите автомобиль</h1>
+          <p class="lead motto">${BRAND_TAGLINE}</p>
+          <p class="support">${BRAND_SUPPORT}</p>
+          <a class="btn comic-cta" href="#catalog">Выбрать автомобиль</a>
+        </div>
+      </section>
+      <section class="catalog-chapter" id="catalog" aria-labelledby="catalogTitle">
+        <h2 id="catalogTitle">Автомобили в демо</h2>
+        <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
+      </section>
     </main>`;
 }
 
@@ -995,29 +1027,41 @@ function renderCar(id, route = parseRoute()) {
       <p class="tag">Оценочный лист · ${car.label}</p>
       <h1>${car.make} ${car.model}, ${car.year}</h1>
       <p class="lead motto">${BRAND_TAGLINE}</p>
-      <section class="sheet-top">
-        ${carPhoto(car, "hero-visual photo-auto", "Фото авто · учебная иллюстрация, не фото реального осмотра")}
-        <div class="sheet-facts">
-          <dl class="facts">
-            <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
-            <div><dt>Цвет</dt><dd>${car.color}</dd></div>
-            <div><dt>Госномер</dt><dd>${car.plate}</dd></div>
-            <div><dt>VIN</dt><dd>${car.vin}</dd></div>
-            <div><dt>Статус осмотра</dt><dd>${STATUS_LABEL[carState.status]}</dd></div>
-          </dl>
-          ${overallHero(id)}
+      <section class="comic-chapter" aria-labelledby="chapter-auto">
+        ${chapterHead("chapter-auto", "Автомобиль", 1)}
+        <div class="sheet-top">
+          ${carPhoto(car, "hero-visual photo-auto", "Фото авто · учебная иллюстрация, не фото реального осмотра")}
+          <div class="sheet-facts">
+            <dl class="facts">
+              <div><dt>Пробег</dt><dd>${car.mileage.toLocaleString("ru-RU")} км</dd></div>
+              <div><dt>Цвет</dt><dd>${car.color}</dd></div>
+              <div><dt>Госномер</dt><dd>${car.plate}</dd></div>
+              <div><dt>VIN</dt><dd>${car.vin}</dd></div>
+              <div><dt>Статус осмотра</dt><dd>${STATUS_LABEL[carState.status]}</dd></div>
+            </dl>
+            ${overallHero(id)}
+          </div>
         </div>
+      </section>
+      <section class="comic-chapter" aria-labelledby="chapter-scheme">
+        ${chapterHead("chapter-scheme", "Схема", 2)}
         ${carSchemeHTML(id)}
       </section>
       ${unpublished ? unpublishedBlock(car) : ""}
       ${unpublished ? "" : `<p class="formula">${FORMULA_DISCLAIMER}</p>`}
       ${highlightsHTML(id)}
-      ${conditionLegend()}
-      <h2>Выберите раздел</h2>
-      <p class="lead">Выберите раздел, чтобы посмотреть оценки, замечания и фото.</p>
-      ${masterFilterNote()}
-      ${directionButtonsHTML(id, dirs)}
-      ${finalVerdictHTML(id)}
+      <section class="comic-chapter" aria-labelledby="chapter-checks">
+        ${chapterHead("chapter-checks", "Проверки", 3)}
+        ${conditionLegend()}
+        <h2>Выберите раздел</h2>
+        <p class="lead">Выберите раздел, чтобы посмотреть оценки, замечания и фото.</p>
+        ${masterFilterNote()}
+        ${directionButtonsHTML(id, dirs)}
+      </section>
+      <section class="comic-chapter" aria-labelledby="chapter-verdict">
+        ${chapterHead("chapter-verdict", "Итог", 4)}
+        ${finalVerdictHTML(id)}
+      </section>
       <p class="no-print"><button type="button" class="btn ghost" id="printReport">Печать листа</button></p>
       ${printAllHTML(id, dirs)}
       ${renderWhatsApp(car)}

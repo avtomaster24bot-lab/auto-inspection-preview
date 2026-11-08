@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108i/);
-  assert.match(sw, /scheme\.js\?v=20261108i/);
+  assert.match(sw, /access\.js\?v=20261108j/);
+  assert.match(sw, /scheme\.js\?v=20261108j/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,7 +824,64 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108i/);
-  assert.match(sw, /diagrams\.js\?v=20261108i/);
+  assert.match(sw, /defects\.js\?v=20261108j/);
+  assert.match(sw, /diagrams\.js\?v=20261108j/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
+});
+
+
+test("comic theme ships licensed local Cyrillic display fonts", () => {
+  const comic = readFileSync(fileURLToPath(new URL("../css/comic.css", import.meta.url)), "utf8");
+  const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+  const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(html, /css\/comic\.css\?v=20261108j/);
+  assert.match(comic, /@font-face/);
+  assert.match(comic, /font-family:\s*"Russo One"/);
+  assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
+  assert.match(comic, /font-family:\s*"Manrope"/);
+  assert.match(comic, /url\("\.\.\/fonts\/russo-one\.woff2"\)/);
+  assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
+  assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
+  assert.match(comic, /U\+0400/);
+  assert.match(sw, /css\/comic\.css\?v=20261108j/);
+  assert.match(sw, /fonts\/russo-one\.woff2/);
+  assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
+  assert.match(sw, /fonts\/manrope-variable\.woff2/);
+  for (const file of ["russo-one.woff2", "balsamiq-sans-bold.woff2", "manrope-variable.woff2"]) {
+    const full = fileURLToPath(new URL(`../fonts/${file}`, import.meta.url));
+    assert.equal(existsSync(full), true, `${file} missing`);
+    assert.ok(statSync(full).size > 10_000, `${file} too small`);
+  }
+  assert.match(app, /dir-spine/);
+  assert.match(app, /chapter-auto/);
+  assert.match(app, /"Автомобиль"/);
+  assert.match(app, /"Схема"/);
+  assert.match(app, /"Проверки"/);
+  assert.match(app, /"Итог"/);
+  assert.match(app, /разделов проверки/);
+});
+
+test("prefers-reduced-motion disables decorative motion", () => {
+  const comic = readFileSync(fileURLToPath(new URL("../css/comic.css", import.meta.url)), "utf8");
+  assert.match(comic, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  const reduced = comic.slice(comic.indexOf("prefers-reduced-motion"));
+  assert.match(reduced, /animation:\s*none/);
+  assert.match(reduced, /scroll-behavior:\s*auto/);
+});
+
+test("annotation stage is not skewed or rotated", () => {
+  const css = [
+    readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8"),
+    readFileSync(fileURLToPath(new URL("../css/comic.css", import.meta.url)), "utf8"),
+  ].join("\n");
+  const rules = [...css.matchAll(/\.defect-map-stage(?:\s+img)?[^{]*\{[^}]*\}/g)].map((item) => item[0]);
+  assert.ok(rules.length >= 2, "expected defect-map-stage rules");
+  for (const rule of rules) {
+    assert.equal(/skew(?:X|Y)?\s*\(/.test(rule), false, rule);
+    assert.equal(/rotate(?:3d|X|Y|Z)?\s*\(/.test(rule), false, rule);
+    if (/transform\s*:/.test(rule)) {
+      assert.match(rule, /transform:\s*none/);
+    }
+  }
 });

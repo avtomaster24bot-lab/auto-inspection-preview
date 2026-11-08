@@ -1,4 +1,4 @@
-import { schemeForCar } from "./scheme.js?v=20261108i";
+import { schemeForCar } from "./scheme.js?v=20261108j";
 
 const DISCLAIMER =
   "Иллюстративная схема-образец: не заводской чертёж и не схема конкретного демо-автомобиля.";

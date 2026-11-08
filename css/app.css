@@ -426,7 +426,7 @@ dd { margin: 0; font-weight: 650; }
 }
 .dir-btn {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: 2.45rem 64px minmax(0, 1fr) auto;
   gap: 0.7rem;
   align-items: center;
   width: 100%;
@@ -781,7 +781,7 @@ a.dir-btn:focus-visible, .dir-btn:focus-visible, .scheme-hot:focus-visible, .nod
 }
 @media (max-width: 519px) {
   .photo-gallery { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-  .dir-btn { grid-template-columns: 52px minmax(0, 1fr) auto; min-height: 64px; }
+  .dir-btn { grid-template-columns: 2.15rem 52px minmax(0, 1fr) auto; min-height: 64px; }
   .dir-thumb { width: 52px; height: 40px; }
 }
 @media (min-width: 640px) {
