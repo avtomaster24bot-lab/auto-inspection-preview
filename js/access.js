@@ -1,5 +1,5 @@
-import { DIRECTIONS, orderedDirections, liveScoresForCar, scoreInputFromResults } from "./data.js?v=20261108k";
-import { computeScores } from "./scoring.js?v=20261108k";
+import { DIRECTIONS, orderedDirections, liveScoresForCar, scoreInputFromResults } from "./data.js?v=20261108l";
+import { computeScores } from "./scoring.js?v=20261108l";
 
 export function visibleDirections() {
   return orderedDirections(DIRECTIONS);

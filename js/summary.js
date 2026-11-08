@@ -1,4 +1,4 @@
-import { formatScore, DEFAULT_SCORING_CONFIG } from "./scoring.js?v=20261108k";
+import { formatScore, DEFAULT_SCORING_CONFIG } from "./scoring.js?v=20261108l";
 
 export const CONDITION_GOOD_MIN = 8;
 export const CONDITION_NOTES_MIN = 5;

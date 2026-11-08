@@ -1,14 +1,14 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108k";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108k";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108k";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108k";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108k";
-import { directionThumb } from "./icons.js?v=20261108k";
-import { folderKey } from "./folder.js?v=20261108k";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108k";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108k";
-import { schemeForCar } from "./scheme.js?v=20261108k";
-import { diagramsForDirection } from "./diagrams.js?v=20261108k";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108l";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108l";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108l";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108l";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108l";
+import { directionThumb } from "./icons.js?v=20261108l";
+import { folderKey } from "./folder.js?v=20261108l";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108l";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108l";
+import { schemeForCar } from "./scheme.js?v=20261108l";
+import { diagramsForDirection } from "./diagrams.js?v=20261108l";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -22,7 +22,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108k";
+} from "./defects.js?v=20261108l";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -32,8 +32,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108k";
-import { ASSET_VERSION } from "./version.js?v=20261108k";
+} from "./media.js?v=20261108l";
+import { ASSET_VERSION } from "./version.js?v=20261108l";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -48,6 +48,12 @@ const BRAND_HOOK = "Покупай автомобиль правильно!";
 const BRAND_FULL = "Авто Лидер — Проверенные авто!";
 const BRAND_TAGLINE = "Состояние авто — без тёмных пятен";
 const BRAND_SUPPORT = "Понятные оценки, фото и замечания — чтобы знать, что покупаешь.";
+const HOME_HOOK = "Узнай состояние машины до покупки — и плати за автомобиль, а не за скрытые проблемы.";
+const HOME_BENEFITS = [
+  "Понимай, что с автомобилем на самом деле.",
+  "Знай, что нужно ремонтировать, а что менять не требуется.",
+  "Оценивай реальную стоимость с учётом состояния и предстоящих вложений.",
+];
 
 function inspectionScope() {
   const sections = orderedDirections().length;
@@ -981,6 +987,10 @@ function carCard(car) {
 function renderHome() {
   const cover = SAMPLE_CARS[0];
   const { sections, points } = inspectionScope();
+  const benefitItems = HOME_BENEFITS.map((item, index) => `<li class="benefit-card">
+        <span class="benefit-num" aria-hidden="true">${index + 1}</span>
+        <p>${escapeHtml(item)}</p>
+      </li>`).join("");
   return `${header()}
     <main class="wrap">
       <section class="welcome-hero" aria-labelledby="welcomeTitle">
@@ -991,12 +1001,14 @@ function renderHome() {
         </div>
         <div class="welcome-copy">
           <p class="chapter-kicker">${escapeHtml(BRAND_FULL)}</p>
-          <h1 id="welcomeTitle">Выберите автомобиль</h1>
+          <h1 id="welcomeTitle">${BRAND_HOOK}</h1>
+          <p class="home-hook">${escapeHtml(HOME_HOOK)}</p>
           <p class="lead motto">${BRAND_TAGLINE}</p>
           <p class="support">${BRAND_SUPPORT}</p>
           <a class="btn comic-cta" href="#catalog">Выбрать автомобиль</a>
         </div>
       </section>
+      <ul class="benefit-cards" aria-label="Зачем проверять автомобиль перед покупкой">${benefitItems}</ul>
       <section class="catalog-chapter" id="catalog" aria-labelledby="catalogTitle">
         <h2 id="catalogTitle">Автомобили в демо</h2>
         <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
