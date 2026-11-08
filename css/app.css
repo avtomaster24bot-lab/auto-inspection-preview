@@ -814,6 +814,267 @@ a.dir-btn:focus-visible, .dir-btn:focus-visible, .scheme-hot:focus-visible, .nod
   }
   .sheet-inner { max-height: 100%; height: 100%; }
 }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  min-height: 2rem;
+  padding: 0.28rem 0.7rem 0.28rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 750;
+  line-height: 1.3;
+  pointer-events: none;
+}
+.status-pill-icon-wrap,
+.status-pill-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  display: block;
+}
+.status-pill-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.status-pill-unchecked,
+.status-pill-unpublished {
+  background: #d9e0e7;
+  color: #2a3542;
+}
+.status-pill-good {
+  background: #c6ecd9;
+  color: #064e38;
+}
+.status-pill-notes {
+  background: #ffe399;
+  color: #5c3a00;
+}
+.status-pill-repair {
+  background: #ffcc99;
+  color: #6b2800;
+}
+.status-pill-critical {
+  background: #b42318;
+  color: #ffffff;
+}
+.kind-critical { box-shadow: inset 6px 0 0 #b42318; }
+.legend {
+  gap: 0.55rem;
+}
+.legend .status-pill { max-width: 100%; }
+.node-chip {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.node-chip-copy {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+.node-chip-name { overflow-wrap: anywhere; }
+.dir-btn .status-pill,
+.score-hero .status-pill,
+.final-verdict .status-pill,
+.node-detail .status-pill {
+  margin: 0.25rem 0 0.15rem;
+}
+.defect-scheme {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.defect-disclaimer,
+.defect-source,
+.defect-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.defect-map {
+  margin: 0;
+  min-width: 0;
+}
+.defect-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 0.45rem;
+}
+.defect-map-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.defect-map-stage {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  background: #f4f7fa;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.defect-map-stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.defect-map-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.defect-map.is-placing .defect-map-stage { cursor: crosshair; }
+.defect-mark {
+  position: absolute;
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * 100%);
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.defect-blob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--s) * 100cqw);
+  aspect-ratio: 1.15 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 34%, transparent);
+  border: 2px solid var(--c);
+}
+.defect-num {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+.defect-mark.is-selected .defect-blob {
+  box-shadow: 0 0 0 3px var(--navy);
+}
+.defect-map figcaption { margin: 0.45rem 0 0.2rem; }
+.defect-toolbar,
+.defect-editor-actions,
+.defect-swatches,
+.defect-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.defect-editor {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+}
+.defect-editor h3 { margin: 0; }
+.defect-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.defect-editor legend { font-weight: 700; margin: 0 0 0.35rem; }
+.defect-swatch,
+.defect-size {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+}
+.defect-swatch input,
+.defect-size input { margin-right: 0.35rem; }
+.defect-swatch-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 22%, #fff);
+  color: var(--ink);
+  font-weight: 700;
+  border: 2px solid var(--c);
+}
+.defect-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.defect-list-title { margin: 0.2rem 0 0; }
+.defect-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c) 16%, #fff);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.defect-card.is-selected { outline: 3px solid var(--navy); outline-offset: 1px; }
+.defect-card-num {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  font-weight: 800;
+}
+.defect-card-body { display: grid; gap: 0.2rem; min-width: 0; }
+.defect-card-sev { font-weight: 750; }
+.defect-card-desc { overflow-wrap: anywhere; }
+.defect-card-node { color: var(--muted); font-size: 0.92rem; }
+.defect-empty { margin: 0; color: var(--muted); }
+.print-defect-map { margin: 0 0 1rem; break-inside: avoid; }
+.print-defect-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.print-defect-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+
 @media print {
   .badge, .top, .no-print, .back, .more, .dir-buttons, .dir-btn, .sheet-dialog, .car-scheme, .btn, .media-tabs, .app-actions, .header-action { display: none !important; }
   .print-all { display: block !important; }

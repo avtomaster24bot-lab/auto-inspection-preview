@@ -1,4 +1,4 @@
-import { computeScores } from "./scoring.js?v=20261108h";
+import { computeScores } from "./scoring.js?v=20261108i";
 
 export const DIRECTIONS = [
   {
@@ -348,6 +348,15 @@ export function ensureCarShape(carState) {
       publicComment: current.publicComment || "",
       internalComment: current.internalComment || "",
     };
+  }
+  if (!carState.diagramDefects || typeof carState.diagramDefects !== "object" || Array.isArray(carState.diagramDefects)) {
+    carState.diagramDefects = Object.fromEntries(DIRECTIONS.map((direction) => [direction.slug, []]));
+  } else {
+    for (const direction of DIRECTIONS) {
+      if (!Array.isArray(carState.diagramDefects[direction.slug])) {
+        carState.diagramDefects[direction.slug] = [];
+      }
+    }
   }
   const named = carState.publishedSnapshot?.scores?.directionScores;
   if (Array.isArray(named)) {

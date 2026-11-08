@@ -1,13 +1,28 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108h";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108h";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108h";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108h";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108h";
-import { directionThumb } from "./icons.js?v=20261108h";
-import { folderKey } from "./folder.js?v=20261108h";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108h";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108h";
-import { schemeForCar } from "./scheme.js?v=20261108h";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108i";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108i";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108i";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108i";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108i";
+import { directionThumb } from "./icons.js?v=20261108i";
+import { folderKey } from "./folder.js?v=20261108i";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108i";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108i";
+import { schemeForCar } from "./scheme.js?v=20261108i";
+import { diagramsForDirection } from "./diagrams.js?v=20261108i";
+import {
+  DEFECT_COLORS,
+  DEFECT_SIZES,
+  addDefect,
+  authorizedDefects,
+  cloneDiagramDefects,
+  colorMeta,
+  defectsForView,
+  isTap,
+  pointFromClientRect,
+  removeDefect,
+  sizeMeta,
+  updateDefect,
+} from "./defects.js?v=20261108i";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -17,8 +32,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108h";
-import { ASSET_VERSION } from "./version.js?v=20261108h";
+} from "./media.js?v=20261108i";
+import { ASSET_VERSION } from "./version.js?v=20261108i";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -41,6 +56,9 @@ let sheetNode = null;
 let sheetPane = "checks";
 let lastDirTrigger = null;
 let lastViewerTrigger = null;
+let defectMode = null;
+let defectPending = null;
+let selectedDefectId = null;
 
 let state = hydrate();
 let saveTimer = 0;
@@ -214,28 +232,44 @@ function header() {
   </header>`;
 }
 
-function conditionLegend() {
-  return `<ul class="legend" aria-label="Как читать оценки">
-    <li><span class="cond-mark cond-unchecked" aria-hidden="true">–</span> Не проверено</li>
-    <li><span class="cond-mark cond-good" aria-hidden="true">✓</span> Хорошее состояние</li>
-    <li><span class="cond-mark cond-notes" aria-hidden="true">!</span> Есть замечания</li>
-    <li><span class="cond-mark cond-repair" aria-hidden="true">×</span> Нужен ремонт</li>
-    <li><span class="cond-mark cond-crit" aria-hidden="true">!</span> Критичные замечания</li>
-  </ul>`;
+function statusIconSVG(kind) {
+  if (kind === "good") {
+    return `<svg class="status-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#0b6b4a"/><path d="M7.2 12.4 10.3 15.5 16.8 8.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  if (kind === "notes") {
+    return `<svg class="status-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="#b37400"/><path d="M12 7.2v6.6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1.15" fill="#fff"/></svg>`;
+  }
+  if (kind === "repair") {
+    return `<svg class="status-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#b14800"/><path d="M14.8 7.1a3.1 3.1 0 0 0-4 4L7 14.9 9.1 17l3.8-3.8a3.1 3.1 0 0 0 4-4l-1.6 1.6-1.5-1.5z" fill="#fff"/></svg>`;
+  }
+  if (kind === "critical") {
+    return `<svg class="status-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 2.6h7.6L21.4 8.2v7.6l-5.6 5.6H8.2L2.6 15.8V8.2L8.2 2.6z" fill="#fff"/><path d="M12 7.1v6" stroke="#b42318" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.4" r="1.15" fill="#b42318"/></svg>`;
+  }
+  return `<svg class="status-pill-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#5b6775"/><path d="M8 12h8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 }
 
-function condMark(kind) {
-  if (kind === "good") return "✓";
-  if (kind === "notes") return "!";
-  if (kind === "repair") return "×";
-  return "–";
+function statusPillHTML(summary) {
+  const status = statusPresentation(summary);
+  return `<span class="status-pill status-pill-${status.kind}"><span class="status-pill-icon-wrap" aria-hidden="true">${statusIconSVG(status.kind)}</span><span class="status-pill-text">${escapeHtml(status.label)}</span></span>`;
+}
+
+function conditionLegend() {
+  const items = [
+    { kind: "unchecked", label: "Не проверено" },
+    { kind: "good", label: "Хорошее состояние" },
+    { kind: "notes", label: "Требует внимания" },
+    { kind: "repair", label: "Нужен ремонт" },
+    { kind: "critical", label: "Критичный дефект" },
+  ];
+  return `<ul class="legend" aria-label="Как читать оценки">${items
+    .map((item) => `<li>${statusPillHTML(item)}</li>`)
+    .join("")}</ul>`;
 }
 
 function summaryFields(summary) {
   return `<p class="dir-score">${escapeHtml(summary.scoreText)}</p>
-    <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span><span>${escapeHtml(summary.label)}</span></p>
-    <p class="dir-cov">${escapeHtml(summary.coverageText)} проверено</p>
-    ${summary.hasCritical ? `<p class="dir-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Есть критичные замечания</span></p>` : ""}`;
+    ${statusPillHTML(summary)}
+    <p class="dir-cov">${escapeHtml(summary.coverageText)} проверено</p>`;
 }
 
 function overallHero(carId) {
@@ -244,9 +278,8 @@ function overallHero(carId) {
   return `<div class="score-hero score-hero-mini ${severityClass(summary)}" data-overall-hero>
     <strong>${escapeHtml(summary.scoreText)}</strong>
     <div>
-      <p class="cond cond-${summary.kind}"><span class="cond-mark" aria-hidden="true">${condMark(summary.kind)}</span><span>${escapeHtml(summary.label)}</span></p>
+      ${statusPillHTML(summary)}
       <p>Проверено ${escapeHtml(summary.coverageText)}</p>
-      ${summary.hasCritical ? `<p class="dir-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Есть критичные замечания</span></p>` : ""}
     </div>
   </div>`;
 }
@@ -353,9 +386,8 @@ function nodeScoreLabel(score) {
   return score == null ? "не проверено" : `${score}/10`;
 }
 
-function nodeChipKind(result) {
-  if (!result || result.score == null) return "unchecked";
-  return conditionFromScore(result.score).kind;
+function nodeChipKind(result, checkpoint) {
+  return nodeStatus(result, checkpoint).kind;
 }
 
 function nodeListHTML(carId, direction) {
@@ -364,8 +396,12 @@ function nodeListHTML(carId, direction) {
     ${direction.checkpoints
       .map((checkpoint) => {
         const result = results[checkpoint.slug] || {};
-        return `<button type="button" class="node-chip kind-${nodeChipKind(result)}" data-select-node="${checkpoint.slug}">
-          <span>${escapeHtml(checkpoint.name)}${checkpoint.isCritical ? ` <span class="crit">критичный</span>` : ""}</span>
+        const status = nodeStatus(result, checkpoint);
+        return `<button type="button" class="node-chip kind-${status.kind}" data-select-node="${checkpoint.slug}">
+          <span class="node-chip-copy">
+            <span class="node-chip-name">${escapeHtml(checkpoint.name)}${checkpoint.isCritical ? ` <span class="crit">критичный</span>` : ""}</span>
+            ${statusPillHTML(status)}
+          </span>
           <span class="node-score" data-node-score="${checkpoint.slug}">${nodeScoreLabel(result.score)}</span>
         </button>`;
       })
@@ -412,6 +448,7 @@ function nodeDetailHTML(carId, direction, checkpoint, result) {
   return `<div class="node-detail">
     <button type="button" class="text-btn" data-back-nodes>Назад к списку</button>
     <h3>${escapeHtml(checkpoint.name)} ${checkpoint.isCritical ? `<span class="crit">критичный</span>` : ""}</h3>
+    ${statusPillHTML(nodeStatus(result, checkpoint))}
     <p class="node-score" data-node-score="${checkpoint.slug}">${nodeScoreLabel(result.score)}</p>
     ${editable ? nodeEditorHTML(direction, checkpoint, result, seeInternal) : nodeReadHTML(checkpoint, result, seeInternal)}
   </div>`;
@@ -439,7 +476,7 @@ function printAllHTML(carId, dirs) {
         .join("");
       ensureCarShape(carState);
       const note = carState.directionNotes[direction.slug]?.publicComment;
-      return `<section><h3>${title}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul></section>`;
+      return `<section><h3>${title}</h3><p>${note ? escapeHtml(note) : "Описание направления пока не заполнено."}</p><ul>${items}</ul>${printDefectsHTML(carId, direction, access)}</section>`;
     })
     .join("")}</div>`;
 }
@@ -518,7 +555,7 @@ function finalVerdictHTML(carId) {
   const faults = overview.unpublished ? [] : overview.scores.criticalFaults || [];
   let critLine = "";
   if (!overview.unpublished && faults.length) {
-    critLine = `<p class="verdict-crit"><span class="cond-mark cond-crit" aria-hidden="true">!</span><span>Критичные замечания: ${faults.map((item) => `${escapeHtml(item.name)}: ${item.score}/10`).join("; ")}</span></p>`;
+    critLine = `<p class="verdict-crit"><strong>Критичные дефекты:</strong> ${faults.map((item) => `${escapeHtml(item.name)}: ${item.score}/10`).join("; ")}</p>`;
   } else if (!overview.unpublished && checked > 0) {
     critLine = `<p class="verdict-ok">В проверенных критичных узлах отдельных предупреждений нет.</p>`;
   }
@@ -531,7 +568,7 @@ function finalVerdictHTML(carId) {
   const condition =
     progress.key === "unpublished" || progress.key === "none"
       ? ""
-      : `<p class="cond cond-${progress.kind}"><span class="cond-mark" aria-hidden="true">${condMark(progress.kind)}</span><span>${escapeHtml(progress.label)}</span></p>`;
+      : statusPillHTML(progress);
   return `<section class="final-verdict ${severityClass(progress)}" data-final-verdict id="finalVerdict">
     <h2>Итоговая оценка автомобиля</h2>
     <p class="verdict-stage">${escapeHtml(progress.completionLabel)}</p>
@@ -569,9 +606,336 @@ function sheetDialogHTML() {
   </dialog>`;
 }
 
+function resetDefectDraft() {
+  defectMode = null;
+  defectPending = null;
+}
+
+function resetDefectUi() {
+  resetDefectDraft();
+  selectedDefectId = null;
+}
+
+function liveDefectList(carId, slug) {
+  const carState = state.cars[carId];
+  ensureCarShape(carState);
+  if (!Array.isArray(carState.diagramDefects[slug])) carState.diagramDefects[slug] = [];
+  return carState.diagramDefects[slug];
+}
+
+function writeDefectList(carId, slug, nextList) {
+  const list = liveDefectList(carId, slug);
+  list.splice(0, list.length, ...nextList);
+  persist();
+}
+
+function defectMarkHTML(item, selectedId) {
+  const meta = colorMeta(item.color);
+  const size = sizeMeta(item.size);
+  const selected = item.id === selectedId ? " is-selected" : "";
+  const label = `Отметка ${item.number}, ${meta.label}: ${item.description}`;
+  return `<button type="button" class="defect-mark${selected}" data-defect-pick="${escapeHtml(item.id)}" style="--x:${item.x};--y:${item.y};--s:${size.scale};--c:${meta.hex}" aria-label="${escapeHtml(label)}" aria-pressed="${item.id === selectedId ? "true" : "false"}">
+      <span class="defect-blob" aria-hidden="true"></span>
+      <span class="defect-num" aria-hidden="true">${item.number}</span>
+    </button>`;
+}
+
+function defectEditorHTML(direction, defect, mode) {
+  const current = defect || { color: "attention", size: "m", description: "", nodeId: "" };
+  const colors = Object.values(DEFECT_COLORS)
+    .map(
+      (item) => `<label class="defect-swatch">
+        <input type="radio" name="defect-color" value="${item.id}" ${current.color === item.id ? "checked" : ""}>
+        <span class="defect-swatch-chip" style="--c:${item.hex}">${escapeHtml(item.label)}</span>
+      </label>`,
+    )
+    .join("");
+  const sizes = Object.values(DEFECT_SIZES)
+    .map(
+      (item) => `<label class="defect-size">
+        <input type="radio" name="defect-size" value="${item.id}" ${current.size === item.id ? "checked" : ""}>
+        <span>${escapeHtml(item.label)}</span>
+      </label>`,
+    )
+    .join("");
+  const nodes = [`<option value="">Не связывать с пунктом</option>`]
+    .concat(
+      direction.checkpoints.map(
+        (checkpoint) =>
+          `<option value="${escapeHtml(checkpoint.slug)}" ${current.nodeId === checkpoint.slug ? "selected" : ""}>${escapeHtml(checkpoint.name)}</option>`,
+      ),
+    )
+    .join("");
+  const title = mode === "add" ? "Новая отметка" : `Отметка ${defect.number}`;
+  return `<form class="defect-editor" data-defect-editor>
+      <h3>${escapeHtml(title)}</h3>
+      <fieldset><legend>Важность</legend><div class="defect-swatches">${colors}</div></fieldset>
+      <fieldset><legend>Размер пятна</legend><div class="defect-sizes">${sizes}</div></fieldset>
+      <label>Описание дефекта
+        <textarea name="description" required maxlength="400" rows="3">${escapeHtml(current.description)}</textarea>
+      </label>
+      <label>Связать с пунктом проверки (необязательно)
+        <select name="nodeId">${nodes}</select>
+      </label>
+      <div class="defect-editor-actions">
+        <button type="submit" class="btn">Сохранить</button>
+        <button type="button" class="btn ghost" data-defect-cancel>Отменить</button>
+        ${
+          mode === "edit"
+            ? `<button type="button" class="btn ghost" data-defect-move>Переместить</button>
+        <button type="button" class="btn ghost" data-defect-delete>Удалить отметку</button>`
+            : ""
+        }
+      </div>
+    </form>`;
+}
+
+function schemePaneHTML(carId, direction, editable) {
+  const car = carMeta(carId) || { id: carId };
+  const pack = diagramsForDirection(direction.slug, car);
+  const access = accessFor(state.cars[carId], direction.slug);
+  const auth = authorizedDefects(access, state.cars[carId], direction.slug);
+  const list = auth.list;
+  const placing = defectMode === "add" || defectMode === "move";
+  const maps = pack.views
+    .map((view) => {
+      const marks = defectsForView(list, view.id, view.assetId)
+        .map((item) => defectMarkHTML(item, selectedDefectId))
+        .join("");
+      const tag = view.frontTag ? `<span class="scheme-front-tag">${escapeHtml(view.frontTag)}</span>` : "";
+      return `<figure class="defect-map${placing ? " is-placing" : ""}">
+        <div class="defect-map-head">
+          <h3 class="defect-map-title">${escapeHtml(view.title)}</h3>
+          <button type="button" class="btn ghost defect-zoom" data-scheme-zoom="${escapeHtml(view.src)}" data-scheme-alt="${escapeHtml(view.alt)}" aria-label="${escapeHtml(view.title)}: увеличить" aria-haspopup="dialog" aria-controls="schemeZoomDialog">Увеличить</button>
+        </div>
+        <div class="defect-map-stage" data-defect-stage data-diagram-view="${escapeHtml(view.id)}" data-diagram-asset="${escapeHtml(view.assetId)}">
+          <img src="${escapeHtml(view.src)}" width="${view.width}" height="${view.height}" alt="${escapeHtml(view.alt)}" draggable="false">
+          ${tag}
+          <div class="defect-map-layer">${marks}</div>
+        </div>
+        <figcaption>${escapeHtml(view.caption)}</figcaption>
+        <p class="defect-source">Источник схемы: <a href="${escapeHtml(view.source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(view.source.title)}</a> · ${escapeHtml(view.source.author)} · ${escapeHtml(view.source.license)}</p>
+      </figure>`;
+    })
+    .join("");
+  let toolbar = "";
+  if (editable) {
+    toolbar = `<div class="defect-toolbar">
+      ${defectMode === "add" ? "" : `<button type="button" class="btn" data-defect-add>Добавить дефект</button>`}
+      ${
+        defectMode === "add" && !defectPending
+          ? `<p class="defect-hint" role="status">Нажмите на схему, куда поставить отметку.</p>
+      <button type="button" class="btn ghost" data-defect-center>Поставить в центре</button>
+      <button type="button" class="btn ghost" data-defect-cancel>Отменить</button>`
+          : ""
+      }
+      ${
+        defectMode === "move"
+          ? `<p class="defect-hint" role="status">Нажмите новое место на схеме.</p>
+      <button type="button" class="btn ghost" data-defect-cancel>Отменить</button>`
+          : ""
+      }
+    </div>`;
+  } else {
+    toolbar = `<p class="hint">Отметки из опубликованного отчёта. Добавлять и менять их может назначенный специалист.</p>`;
+  }
+  let editor = "";
+  if (editable && defectMode === "add" && defectPending) {
+    editor = defectEditorHTML(direction, { color: "attention", size: "m", description: "", nodeId: "" }, "add");
+  } else if (editable && selectedDefectId && defectMode !== "add") {
+    const selected = list.find((item) => item.id === selectedDefectId);
+    if (selected) editor = defectEditorHTML(direction, selected, "edit");
+  }
+  const cards = list.length
+    ? list
+        .map((item) => {
+          const meta = colorMeta(item.color);
+          const selected = item.id === selectedDefectId ? " is-selected" : "";
+          const node = item.nodeId ? direction.checkpoints.find((checkpoint) => checkpoint.slug === item.nodeId) : null;
+          return `<button type="button" class="defect-card${selected}" data-defect-card="${escapeHtml(item.id)}" style="--c:${meta.hex}">
+          <span class="defect-card-num" aria-hidden="true">${item.number}</span>
+          <span class="defect-card-body">
+            <span class="defect-card-sev">${escapeHtml(meta.label)}</span>
+            <span class="defect-card-desc">${escapeHtml(item.description)}</span>
+            ${node ? `<span class="defect-card-node">${escapeHtml(node.name)}</span>` : ""}
+          </span>
+        </button>`;
+        })
+        .join("")
+    : `<p class="defect-empty">Отметок пока нет</p>`;
+  return `<section class="defect-scheme" data-defect-scheme>
+      <p class="defect-disclaimer">${escapeHtml(pack.disclaimer)}</p>
+      ${maps}
+      ${toolbar}
+      ${editor}
+      <h3 class="defect-list-title">Отметки на схеме</h3>
+      <div class="defect-list">${cards}</div>
+    </section>`;
+}
+
+function readDefectForm(root) {
+  const form = root.querySelector("[data-defect-editor]");
+  if (!form) return null;
+  return {
+    color: form.querySelector("input[name='defect-color']:checked")?.value,
+    size: form.querySelector("input[name='defect-size']:checked")?.value,
+    description: form.querySelector("textarea[name='description']")?.value,
+    nodeId: form.querySelector("select[name='nodeId']")?.value,
+  };
+}
+
+function bindDefectScheme(root, carId, direction) {
+  const slug = direction.slug;
+  const refresh = () => fillSheetBody(carId, direction);
+
+  root.querySelector("[data-defect-add]")?.addEventListener("click", () => {
+    defectMode = "add";
+    defectPending = null;
+    selectedDefectId = null;
+    refresh();
+  });
+  root.querySelectorAll("[data-defect-cancel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      resetDefectDraft();
+      refresh();
+    });
+  });
+  root.querySelector("[data-defect-center]")?.addEventListener("click", () => {
+    const first = diagramsForDirection(slug, carMeta(carId) || {}).views[0];
+    if (!first) return;
+    defectPending = { viewId: first.id, assetId: first.assetId, x: 0.5, y: 0.5 };
+    refresh();
+  });
+  root.querySelector("[data-defect-editor]")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fields = readDefectForm(root);
+    if (!fields) return;
+    if (defectMode === "add" && defectPending) {
+      const result = addDefect(liveDefectList(carId, slug), { ...fields, ...defectPending });
+      if (!result.ok) return;
+      writeDefectList(carId, slug, result.list);
+      selectedDefectId = result.defect.id;
+      resetDefectDraft();
+      refresh();
+      return;
+    }
+    if (selectedDefectId) {
+      const result = updateDefect(liveDefectList(carId, slug), selectedDefectId, fields);
+      if (!result.ok) return;
+      writeDefectList(carId, slug, result.list);
+      resetDefectDraft();
+      refresh();
+    }
+  });
+  root.querySelector("[data-defect-move]")?.addEventListener("click", () => {
+    defectMode = "move";
+    refresh();
+  });
+  root.querySelector("[data-defect-delete]")?.addEventListener("click", () => {
+    if (!selectedDefectId) return;
+    writeDefectList(carId, slug, removeDefect(liveDefectList(carId, slug), selectedDefectId));
+    selectedDefectId = null;
+    resetDefectDraft();
+    refresh();
+  });
+
+  const selectDefect = (id) => {
+    selectedDefectId = id;
+    if (defectMode === "add") resetDefectDraft();
+    refresh();
+    window.requestAnimationFrame(() => {
+      document.getElementById("catDialogBody")?.querySelector(`[data-defect-card="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+  root.querySelectorAll("[data-defect-card]").forEach((button) => {
+    button.addEventListener("click", () => selectDefect(button.getAttribute("data-defect-card")));
+  });
+  root.querySelectorAll("[data-defect-pick]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectDefect(button.getAttribute("data-defect-pick"));
+    });
+  });
+
+  root.querySelectorAll("[data-defect-stage]").forEach((stage) => {
+    const img = stage.querySelector("img");
+    let down = null;
+    stage.addEventListener("pointerdown", (event) => {
+      if (event.button != null && event.button !== 0) return;
+      down = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    });
+    stage.addEventListener("pointerup", (event) => {
+      if (event.target.closest("[data-defect-pick]")) {
+        down = null;
+        return;
+      }
+      if (!down || event.pointerId !== down.id) return;
+      const moved = !isTap(event.clientX - down.x, event.clientY - down.y);
+      down = null;
+      if (moved) return;
+      if (defectMode !== "add" && defectMode !== "move") return;
+      const point = pointFromClientRect(img.getBoundingClientRect(), event.clientX, event.clientY);
+      if (!point) return;
+      const viewId = stage.getAttribute("data-diagram-view");
+      const assetId = stage.getAttribute("data-diagram-asset");
+      if (defectMode === "add") {
+        defectPending = { ...point, viewId, assetId };
+        refresh();
+        return;
+      }
+      if (defectMode === "move" && selectedDefectId) {
+        const result = updateDefect(liveDefectList(carId, slug), selectedDefectId, point);
+        if (result.ok) writeDefectList(carId, slug, result.list);
+        resetDefectDraft();
+        refresh();
+      }
+    });
+  });
+
+  root.querySelectorAll("[data-scheme-zoom]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const dialog = document.getElementById("schemeZoomDialog");
+      const zoomImg = dialog?.querySelector("img");
+      if (!dialog || !zoomImg) return;
+      zoomImg.src = button.getAttribute("data-scheme-zoom");
+      zoomImg.alt = button.getAttribute("data-scheme-alt") || "Схема";
+      if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
+    });
+  });
+}
+
+function printDefectsHTML(carId, direction, access) {
+  if (access === "blocked") return "";
+  const auth = authorizedDefects(access, state.cars[carId], direction.slug);
+  const list = auth.list;
+  if (!list.length) return `<p>Отметок пока нет</p>`;
+  const pack = diagramsForDirection(direction.slug, carMeta(carId) || {});
+  const maps = pack.views
+    .map((view) => {
+      const marks = defectsForView(list, view.id, view.assetId);
+      if (!marks.length) return "";
+      return `<figure class="print-defect-map">
+        <figcaption>${escapeHtml(view.title)}</figcaption>
+        <div class="defect-map-stage">
+          <img src="${escapeHtml(view.src)}" width="${view.width}" height="${view.height}" alt="${escapeHtml(view.alt)}">
+          <div class="defect-map-layer">${marks.map((item) => defectMarkHTML(item, null)).join("")}</div>
+        </div>
+      </figure>`;
+    })
+    .join("");
+  const items = list
+    .map((item) => {
+      const meta = colorMeta(item.color);
+      return `<li class="print-defect-item" style="--c:${meta.hex}"><span class="defect-card-num">${item.number}</span> ${escapeHtml(meta.label)}: ${escapeHtml(item.description)}</li>`;
+    })
+    .join("");
+  return `${maps}<ol class="print-defect-list">${items}</ol>`;
+}
+
 function sheetTabsHTML(direction, pane) {
   const count = direction.checkpoints.length;
-  return `<button type="button" role="tab" data-sheet-tab="checks" aria-selected="${pane === "checks" ? "true" : "false"}">Проверки (${count})</button>
+  return `<button type="button" role="tab" data-sheet-tab="scheme" aria-selected="${pane === "scheme" ? "true" : "false"}">Схема и дефекты</button>
+    <button type="button" role="tab" data-sheet-tab="checks" aria-selected="${pane === "checks" ? "true" : "false"}">Проверки (${count})</button>
     <button type="button" role="tab" data-sheet-tab="photo" aria-selected="${pane === "photo" ? "true" : "false"}">Фото (<span data-photo-count>0</span>)</button>
     <button type="button" role="tab" data-sheet-tab="video" aria-selected="${pane === "video" ? "true" : "false"}">Видео (<span data-video-count>0</span>)</button>
     <button type="button" role="tab" data-sheet-tab="notes" aria-selected="${pane === "notes" ? "true" : "false"}">Описание</button>`;
@@ -709,6 +1073,7 @@ function render() {
   sheetDir = null;
   sheetNode = null;
   sheetPane = "checks";
+  resetDefectUi();
   const route = parseRoute();
   if (isCarRoute(route) && location.hash !== canonicalHash(route)) {
     history.replaceState(null, "", canonicalHash(route));
@@ -787,6 +1152,11 @@ function fillSheetBody(carId, direction) {
     body.innerHTML = `<p class="sheet-blocked">${escapeHtml(unpublishedSectionMessage(state.role, state.masterId, carState, direction.slug))}</p>`;
     return;
   }
+  if (sheetPane === "scheme") {
+    body.innerHTML = schemePaneHTML(carId, direction, editable);
+    bindDefectScheme(body, carId, direction);
+    return;
+  }
   if (sheetPane === "notes") {
     body.innerHTML = `${directionNotesHTML(carId, direction.slug, editable)}
       ${state.role === "master" && editable ? `<button type="button" class="btn" data-submit="${direction.slug}">Отправить направление на проверку</button>` : ""}`;
@@ -849,6 +1219,7 @@ function fillSheet(carId, slug) {
     tab.addEventListener("click", () => {
       sheetPane = tab.getAttribute("data-sheet-tab");
       sheetNode = null;
+      resetDefectDraft();
       fillSheet(carId, slug);
     });
   });
@@ -864,7 +1235,8 @@ function openCategoryDialog(slug, { updateHash = true, trigger = null } = {}) {
   if (sheetDir && sheetDir !== slug) revokeFolderObjectUrls(carId, sheetDir);
   sheetDir = slug;
   sheetNode = null;
-  sheetPane = "checks";
+  sheetPane = "scheme";
+  resetDefectUi();
   lastDirTrigger = trigger || document.querySelector(`.dir-btn[data-select-dir="${slug}"]`);
   const dialog = document.getElementById("categoryDialog");
   if (!dialog) return;
@@ -1303,6 +1675,7 @@ function bind() {
         createdAt: new Date().toISOString(),
         scores: liveScoresForCar(carState),
         conclusion: carState.conclusion || "",
+        diagramDefects: cloneDiagramDefects(carState.diagramDefects),
       };
       persist();
       render();

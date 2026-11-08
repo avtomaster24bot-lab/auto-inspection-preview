@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { computeScores, DEFAULT_SCORING_CONFIG } from "../js/scoring.js";
 import { buildPublicCarUrl, buildWhatsAppBuyUrl, buildWhatsAppMessage, normalizeKzWhatsAppNumber } from "../js/whatsapp.js";
 import { saveState, loadState, clearState, STORAGE_KEY } from "../js/storage.js";
-import { createDefaultState, DIRECTIONS, SAMPLE_CARS, liveScoresForCar } from "../js/data.js";
+import { createDefaultState, DIRECTIONS, SAMPLE_CARS, liveScoresForCar, ensureCarShape } from "../js/data.js";
 
 test("unchecked scores are excluded from averages", () => {
   const result = computeScores([
@@ -113,7 +113,7 @@ test("local demo state round-trip", () => {
   assert.equal(loadState(memory), null);
 });
 
-import { conditionFromScore, summarizeDirection, summarizeOverall, CONDITION_LABELS } from "../js/summary.js";
+import { conditionFromScore, summarizeDirection, summarizeOverall, CONDITION_LABELS, statusPresentation, nodeStatus } from "../js/summary.js";
 import { DIRECTION_ICON_SLUGS, directionIcon } from "../js/icons.js";
 import { folderKey, nodeFolderKey, parseFolderKey } from "../js/folder.js";
 
@@ -131,7 +131,7 @@ test("unchecked and missing scores never look like zero", () => {
 test("plain language bands and critical warning", () => {
   assert.equal(summarizeDirection({ score: 8, checked: 10, total: 10, criticalFaults: [] }).label, "Хорошее состояние");
   assert.equal(summarizeDirection({ score: 7.8, checked: 10, total: 10, criticalFaults: [] }).scoreText, "7,8/10");
-  assert.equal(summarizeDirection({ score: 6.2, checked: 4, total: 8, criticalFaults: [] }).label, "Есть замечания");
+  assert.equal(summarizeDirection({ score: 6.2, checked: 4, total: 8, criticalFaults: [] }).label, "Требует внимания");
   assert.equal(summarizeDirection({ score: 4.9, checked: 8, total: 8, criticalFaults: [] }).label, "Нужен ремонт");
   const critical = summarizeDirection({
     score: 7.2,
@@ -142,6 +142,9 @@ test("plain language bands and critical warning", () => {
   assert.equal(critical.hasCritical, true);
   assert.equal(critical.criticalCount, 1);
   assert.notEqual(critical.label, CONDITION_LABELS.unchecked);
+  assert.equal(critical.kind, "notes");
+  assert.equal(statusPresentation(critical).kind, "critical");
+  assert.equal(statusPresentation(critical).label, "Критичный дефект");
 });
 
 test("unpublished overview hides live numbers", () => {
@@ -183,7 +186,6 @@ test("folder keys keep cars and directions apart", () => {
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { ensureCarShape } from "../js/data.js";
 import { validateMediaFile, mediaRecordId, mimeToKind, MEDIA_POLICY, isQuotaError } from "../js/media.js";
 
 test("catalog home markup does not embed seven direction tiles", () => {
@@ -252,7 +254,7 @@ test("ensureCarShape adds direction notes without wiping scores", () => {
   assert.equal(electricScore.score, kept);
 });
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { DIRECTION_IMAGES } from "../js/icons.js";
 import { parseRoute, canonicalHash, isCarRoute } from "../js/routes.js";
 
@@ -656,9 +658,173 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108h/);
-  assert.match(sw, /scheme\.js\?v=20261108h/);
+  assert.match(sw, /access\.js\?v=20261108i/);
+  assert.match(sw, /scheme\.js\?v=20261108i/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
+});
+
+
+import {
+  addDefect,
+  authorizedDefects,
+  clamp01,
+  cloneDiagramDefects,
+  defectsForView,
+  emptyDiagramDefects,
+  isTap,
+  normalizeColor,
+  pointFromClientRect,
+  removeDefect,
+  sanitizeDescription,
+  updateDefect,
+} from "../js/defects.js";
+import { diagramsForDirection, listDiagramAssets } from "../js/diagrams.js";
+
+test("status presentation keeps score bands and overrides critical in the pill only", () => {
+  assert.equal(conditionFromScore(null).kind, "unchecked");
+  assert.equal(conditionFromScore(undefined).label, CONDITION_LABELS.unchecked);
+  assert.equal(conditionFromScore(8).kind, "good");
+  assert.equal(conditionFromScore(9.4).label, "Хорошее состояние");
+  assert.equal(conditionFromScore(5).kind, "notes");
+  assert.equal(conditionFromScore(5).label, "Требует внимания");
+  assert.equal(conditionFromScore(4.9).kind, "repair");
+  assert.equal(conditionFromScore(1).label, "Нужен ремонт");
+  assert.equal(conditionFromScore(0).kind, "repair");
+  const goodCritical = summarizeDirection({
+    score: 8.6,
+    checked: 16,
+    total: 16,
+    criticalFaults: [{ name: "Лонжерон передний левый" }],
+  });
+  assert.equal(goodCritical.kind, "good");
+  assert.equal(goodCritical.label, "Хорошее состояние");
+  assert.equal(statusPresentation(goodCritical).kind, "critical");
+  assert.equal(statusPresentation(goodCritical).label, "Критичный дефект");
+  const unpublished = summarizeOverall({ displayedScore: 8, checked: 80, total: 91 }, { unpublished: true });
+  assert.equal(statusPresentation(unpublished).kind, "unpublished");
+  assert.equal(nodeStatus({ score: null }, { isCritical: true }).kind, "unchecked");
+  assert.equal(nodeStatus({ score: 8 }, { isCritical: true }).kind, "good");
+  assert.equal(nodeStatus({ score: 3 }, { isCritical: true }).kind, "critical");
+  assert.equal(nodeStatus({ score: 3 }, { isCritical: false }).kind, "repair");
+});
+
+test("status pills are large high-contrast labels that wrap instead of shrinking", () => {
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(css, /\.status-pill\s*\{[^}]*font-size:\s*0\.9375rem/s);
+  assert.match(css, /\.status-pill\s*\{[^}]*font-weight:\s*750/s);
+  assert.match(css, /\.status-pill-text\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+  assert.equal(/\.status-pill\s*\{[^}]*white-space:\s*nowrap/s.test(css), false);
+  assert.match(css, /\.status-pill-critical\s*\{[^}]*background:\s*#b42318/s);
+  assert.match(css, /\.status-pill-good\s*\{[^}]*color:\s*#064e38/s);
+  assert.match(app, /function statusPillHTML/);
+  assert.match(app, /Требует внимания/);
+  assert.match(app, /Критичный дефект/);
+  assert.match(app, /status-pill-icon/);
+});
+
+test("diagram defect helpers clamp, isolate, freeze snapshots and keep stable numbers", () => {
+  assert.equal(clamp01(-2), 0);
+  assert.equal(clamp01(1.7), 1);
+  assert.equal(clamp01("nope"), 0);
+  assert.equal(normalizeColor("red"), "comment");
+  assert.equal(normalizeColor("critical"), "critical");
+  assert.equal(sanitizeDescription("  <b>масло</b>\u0007  ").includes("<b>масло</b>"), true);
+  assert.equal(sanitizeDescription("  x  ").length, 1);
+  assert.equal(pointFromClientRect({ left: 10, top: 20, width: 100, height: 50 }, 5, 30), null);
+  assert.deepEqual(pointFromClientRect({ left: 10, top: 20, width: 100, height: 50 }, 60, 45), { x: 0.5, y: 0.5 });
+  assert.equal(isTap(3, 4, 12), true);
+  assert.equal(isTap(20, 0, 12), false);
+
+  const first = addDefect([], { viewId: "chassis", assetId: "hodovaya-chassis-v1", x: -1, y: 2, color: "critical", description: "Течь", size: "l" });
+  const second = addDefect(first.list, { viewId: "chassis", assetId: "hodovaya-chassis-v1", x: 0.4, y: 0.4, color: "attention", description: "Люфт" });
+  const third = addDefect(second.list, { viewId: "strut", assetId: "hodovaya-strut-v1", x: 0.2, y: 0.3, color: "comment", description: "Пыльник" });
+  assert.equal(first.ok && second.ok && third.ok, true);
+  assert.notEqual(first.defect.id, second.defect.id);
+  assert.deepEqual(third.list.map((item) => item.number), [1, 2, 3]);
+  const afterDelete = removeDefect(third.list, second.defect.id);
+  assert.deepEqual(afterDelete.map((item) => item.number), [1, 3]);
+  const fourth = addDefect(afterDelete, { viewId: "chassis", assetId: "hodovaya-chassis-v1", x: 0.1, y: 0.1, color: "comment", description: "Ещё" });
+  assert.equal(fourth.defect.number, 4);
+  const moved = updateDefect(fourth.list, first.defect.id, { x: 1.4, y: -0.2, description: "Течь масла" });
+  assert.equal(moved.defect.number, 1);
+  assert.equal(moved.defect.x, 1);
+  assert.equal(moved.defect.y, 0);
+  assert.equal(updateDefect(fourth.list, first.defect.id, { description: "   " }).ok, false);
+  assert.equal(addDefect([], { viewId: "chassis", assetId: "a", x: 0.2, y: 0.2, description: "" }).ok, false);
+  assert.equal(defectsForView(fourth.list, "strut", "hodovaya-strut-v1").length, 1);
+  assert.equal(defectsForView(fourth.list, "chassis", "old-asset").length, 0);
+
+  const live = { hodovaya: moved.list, body: [] };
+  const snap = cloneDiagramDefects(live);
+  moved.list[0].description = "changed live";
+  live.hodovaya.push({ id: "leak", number: 9, viewId: "chassis", assetId: "hodovaya-chassis-v1", x: 0.2, y: 0.2, size: "m", color: "critical", description: "draft" });
+  assert.equal(snap.hodovaya.find((item) => item.id === first.defect.id).description, "Течь масла");
+  assert.equal(snap.hodovaya.some((item) => item.id === "leak"), false);
+
+  const car = ensureCarShape({
+    status: "published",
+    results: {},
+    assignments: {},
+    publishedSnapshot: { scores: { directionScores: [] } },
+  });
+  assert.ok(Array.isArray(car.diagramDefects.hodovaya));
+  car.diagramDefects.hodovaya = fourth.list.slice();
+  assert.equal(authorizedDefects("edit", car, "hodovaya").canEdit, true);
+  assert.equal(authorizedDefects("edit", car, "hodovaya").source, "live");
+  assert.equal(authorizedDefects("public", car, "hodovaya").list.length, 0);
+  assert.equal(authorizedDefects("blocked", car, "hodovaya").list.length, 0);
+  car.publishedSnapshot.diagramDefects = cloneDiagramDefects(car.diagramDefects);
+  car.diagramDefects.hodovaya = [];
+  assert.equal(authorizedDefects("public", car, "hodovaya").list.length > 0, true);
+  assert.equal(authorizedDefects("edit", car, "hodovaya").list.length, 0);
+  const seeded = createDefaultState();
+  ensureCarShape(seeded.cars["primer-sedan"]);
+  assert.equal(authorizedDefects("public", seeded.cars["primer-sedan"], "geometry").list.length, 0);
+});
+
+test("every category has its own sourced diagram assets", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const slugs = ["hodovaya", "body", "engine", "electric", "interior", "geometry", "wheels"];
+  for (const slug of slugs) {
+    const sedan = diagramsForDirection(slug, { bodyType: "sedan" });
+    assert.ok(sedan.views.length >= 1, `${slug} missing views`);
+    for (const view of sedan.views) {
+      const file = fileURLToPath(new URL(`../${view.src}`, import.meta.url));
+      assert.equal(existsSync(file), true, `${view.src} missing`);
+      assert.ok(statSync(file).size > 20_000, `${view.src} too small`);
+      assert.equal(view.width, view.width);
+      assert.ok(view.width >= 1400, `${view.src} too narrow`);
+      assert.ok(view.caption.length > 10);
+      assert.match(view.source.url, /^https:\/\//);
+    }
+  }
+  assert.notEqual(
+    diagramsForDirection("body", { bodyType: "sedan" }).views[0].src,
+    diagramsForDirection("body", { bodyType: "wagon" }).views[0].src,
+  );
+  assert.match(diagramsForDirection("hodovaya", {}).views[0].src, /hodovaya-chassis/);
+  assert.match(diagramsForDirection("engine", {}).views[0].src, /engine-1nz/);
+  assert.match(diagramsForDirection("electric", {}).views[0].src, /electric-layout/);
+  assert.match(diagramsForDirection("interior", {}).disclaimer, /не вид сверху/);
+  const assets = listDiagramAssets({ bodyType: "sedan" });
+  assert.ok(assets.length >= 10);
+  const schemeTab = app.indexOf('data-sheet-tab="scheme"');
+  const checksTab = app.indexOf('data-sheet-tab="checks"');
+  assert.ok(schemeTab > -1 && schemeTab < checksTab);
+  assert.match(app, /Схема и дефекты/);
+  assert.match(app, /Отметок пока нет/);
+  assert.match(app, /Добавить дефект/);
+  assert.match(app, /Переместить/);
+  assert.match(app, /Удалить отметку/);
+  assert.match(app, /cloneDiagramDefects/);
+  assert.match(app, /escapeHtml\(item\.description\)/);
+  assert.equal(app.includes("data-scheme-view"), false);
+  assert.equal(app.includes("function condMark"), false);
+  const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
+  assert.match(sw, /defects\.js\?v=20261108i/);
+  assert.match(sw, /diagrams\.js\?v=20261108i/);
+  assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
