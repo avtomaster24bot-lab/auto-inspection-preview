@@ -1,14 +1,23 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108l";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108l";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108l";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108l";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108l";
-import { directionThumb } from "./icons.js?v=20261108l";
-import { folderKey } from "./folder.js?v=20261108l";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108l";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108l";
-import { schemeForCar } from "./scheme.js?v=20261108l";
-import { diagramsForDirection } from "./diagrams.js?v=20261108l";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108m";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108m";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108m";
+import {
+  HOW_BLURBS,
+  bodyPrefLabel,
+  buildWhatsAppBriefUrl,
+  clearBrief,
+  listingUrlError,
+  loadBrief,
+  saveBrief,
+} from "./brief.js?v=20261108m";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108m";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108m";
+import { directionThumb } from "./icons.js?v=20261108m";
+import { folderKey } from "./folder.js?v=20261108m";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108m";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108m";
+import { schemeForCar } from "./scheme.js?v=20261108m";
+import { diagramsForDirection } from "./diagrams.js?v=20261108m";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -22,7 +31,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108l";
+} from "./defects.js?v=20261108m";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -32,8 +41,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108l";
-import { ASSET_VERSION } from "./version.js?v=20261108l";
+} from "./media.js?v=20261108m";
+import { ASSET_VERSION } from "./version.js?v=20261108m";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -222,6 +231,7 @@ function header() {
     </div>
     <nav>
       <a href="#/">Все автомобили</a>
+      <a href="#/kak">Как проверяем</a>
       <button type="button" class="mode-toggle" id="modeToggle" aria-haspopup="dialog">Демо-режим: ${escapeHtml(roleLabel())}</button>
       <button type="button" class="btn ghost header-action" id="sharePage">Поделиться</button>
       <button type="button" class="btn ghost header-action" id="installApp">Установить на телефон</button>
@@ -984,6 +994,211 @@ function carCard(car) {
   </article>`;
 }
 
+
+function bodyPrefOptions(current) {
+  return [
+    ["", "Не указан"],
+    ["any", "Любой"],
+    ["sedan", "Седан"],
+    ["wagon", "Универсал"],
+    ["crossover", "Кроссовер"],
+  ]
+    .map(([value, label]) => `<option value="${value}" ${current === value ? "selected" : ""}>${label}</option>`)
+    .join("");
+}
+
+function journeyCardsHTML() {
+  return `<section class="journey-board" aria-labelledby="journeyTitle">
+      <h2 id="journeyTitle">С чего начать</h2>
+      <p class="lead">Три понятных пути: подбор по задачам, проверка найденного объявления или учебные проверенные авто.</p>
+      <div class="journey-cards">
+        <a class="journey-card journey-card-primary" href="#/podbor">
+          <span class="journey-num" aria-hidden="true">1</span>
+          <h3>Подобрать автомобиль</h3>
+          <p>Опишите бюджет и пожелания. Сохраним учебную заявку в этом браузере и подготовим черновик в WhatsApp.</p>
+        </a>
+        <a class="journey-card" href="#/proverit">
+          <span class="journey-num" aria-hidden="true">2</span>
+          <h3>Проверить выбранное авто</h3>
+          <p>Есть объявление? Оставьте ссылку и посмотрите, как выглядит наш осмотр из 7 разделов и 91 пункта.</p>
+        </a>
+        <a class="journey-card" href="#catalog">
+          <span class="journey-num" aria-hidden="true">3</span>
+          <h3>Выбрать из проверенных</h3>
+          <p>Откройте учебные оценочные листы: схемы, оценки, фото и отметки дефектов.</p>
+        </a>
+      </div>
+    </section>`;
+}
+
+function compareStripHTML() {
+  const cards = SAMPLE_CARS.map((car) => {
+    const overview = overviewFor(car.id);
+    const progress = inspectionProgress(overview.scores, { unpublished: overview.unpublished });
+    return `<article class="compare-card">
+        <h3>${escapeHtml(car.make)} ${escapeHtml(car.model)}</h3>
+        <p>${car.year} · ${car.mileage.toLocaleString("ru-RU")} км</p>
+        <p>${escapeHtml(progress.completionLabel)}: ${escapeHtml(progress.scoreText)}</p>
+        ${statusPillHTML(progress)}
+        <a class="btn" href="#/c/${car.id}">Открыть лист</a>
+      </article>`;
+  }).join("");
+  return `<section class="compare-strip" aria-labelledby="compareTitle">
+      <h2 id="compareTitle">Сравнить учебные листы</h2>
+      <p class="hint">Оценки из осмотра. Рыночную цену сервис сам не считает.</p>
+      <div class="compare-grid">${cards}</div>
+    </section>`;
+}
+
+function briefHonestNote() {
+  return `<p class="hint service-honest">Учебная заявка хранится только в этом браузере. Это не договор и не отправка. Юридическую чистоту, залог, угон и VIN мы здесь автоматически не проверяем — для этого нужна отдельная проверка. Сервис не считает рыночную цену автомобиля.</p>`;
+}
+
+function renderPodbor() {
+  const brief = loadBrief();
+  return `${header()}
+    <main class="wrap service-page">
+      <nav class="crumb" aria-label="Навигация">
+        <a class="back" href="#/">На главную</a>
+        <span aria-hidden="true">/</span>
+        <span>Подобрать автомобиль</span>
+      </nav>
+      <h1>Подобрать автомобиль</h1>
+      <p class="lead">Расскажите, какой автомобиль ищете. Мы сохраним черновик здесь и подготовим сообщение для WhatsApp — вы отправите его сами, если захотите.</p>
+      ${briefHonestNote()}
+      <form class="service-form" id="serviceBrief">
+        <input type="hidden" name="journey" value="podbor">
+        <label>Бюджет
+          <input type="text" name="budget" maxlength="80" value="${escapeHtml(brief.budget)}" placeholder="Например: до 8 млн ₸">
+        </label>
+        <label>Тип кузова
+          <select name="bodyPref">${bodyPrefOptions(brief.bodyPref)}</select>
+        </label>
+        <label>Пожелания
+          <textarea name="preferences" maxlength="400" rows="4" placeholder="Семья, город, пробег, комплектация">${escapeHtml(brief.preferences)}</textarea>
+        </label>
+        <p id="briefFormError" class="hint service-error" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn">Сохранить и посмотреть заявку</button>
+          <a class="btn ghost" href="#/brief">К сохранённой заявке</a>
+        </div>
+      </form>
+    </main>`;
+}
+
+function renderProverit() {
+  const brief = loadBrief();
+  return `${header()}
+    <main class="wrap service-page">
+      <nav class="crumb" aria-label="Навигация">
+        <a class="back" href="#/">На главную</a>
+        <span aria-hidden="true">/</span>
+        <span>Проверить выбранное авто</span>
+      </nav>
+      <h1>Проверить выбранное авто</h1>
+      <p class="lead">Если вы уже нашли объявление, оставьте ссылку и коротко напишите, что смущает. Затем посмотрите учебный осмотр из 7 разделов — так выглядит наш оценочный лист.</p>
+      ${briefHonestNote()}
+      <form class="service-form" id="serviceBrief">
+        <input type="hidden" name="journey" value="inspect">
+        <label>Ссылка на объявление
+          <input type="url" name="listingUrl" maxlength="500" value="${escapeHtml(brief.listingUrl)}" placeholder="https://">
+        </label>
+        <label>Что заметили или хотите проверить
+          <textarea name="notes" maxlength="400" rows="4">${escapeHtml(brief.notes)}</textarea>
+        </label>
+        <p id="briefFormError" class="hint service-error" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn">Сохранить и посмотреть заявку</button>
+          <a class="btn ghost" href="#/c/primer-sedan">Посмотреть пример осмотра</a>
+        </div>
+      </form>
+    </main>`;
+}
+
+function renderBriefReview() {
+  const brief = loadBrief();
+  if (!brief.journey) {
+    return `${header()}
+      <main class="wrap service-page">
+        <nav class="crumb" aria-label="Навигация"><a class="back" href="#/">На главную</a></nav>
+        <h1>Учебная заявка</h1>
+        <p class="lead">Пока нет сохранённой заявки. Выберите путь на главной.</p>
+        ${journeyCardsHTML()}
+      </main>`;
+  }
+  const title = brief.journey === "inspect" ? "Проверить выбранное авто" : "Подобрать автомобиль";
+  const editHash = brief.journey === "inspect" ? "#/proverit" : "#/podbor";
+  const wa = buildWhatsAppBriefUrl(brief);
+  const rows = [
+    ["Запрос", title],
+    ["Бюджет", brief.budget],
+    ["Тип кузова", bodyPrefLabel(brief.bodyPref)],
+    ["Пожелания", brief.preferences],
+    ["Объявление", brief.listingUrl],
+    ["Заметки", brief.notes],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`)
+    .join("");
+  const extra =
+    brief.journey === "inspect"
+      ? `<a class="btn ghost" href="#/c/primer-sedan">Посмотреть пример осмотра</a>`
+      : `<a class="btn ghost" href="#catalog">Посмотреть примеры проверенных авто</a>`;
+  return `${header()}
+    <main class="wrap service-page">
+      <nav class="crumb" aria-label="Навигация">
+        <a class="back" href="#/">На главную</a>
+        <span aria-hidden="true">/</span>
+        <span>Учебная заявка</span>
+      </nav>
+      <h1>Проверьте учебную заявку</h1>
+      ${briefHonestNote()}
+      <section class="brief-review">
+        <dl class="facts">${rows || "<p>Добавьте бюджет, пожелания или ссылку, чтобы заявка стала понятнее.</p>"}</dl>
+        <div class="row">
+          <a class="btn" id="briefWhatsApp" href="${escapeHtml(wa)}" target="_blank" rel="noopener noreferrer">Открыть WhatsApp</a>
+          <a class="btn ghost" href="${editHash}">Изменить</a>
+          <button type="button" class="btn ghost" id="clearBriefOnly">Очистить только заявку</button>
+        </div>
+        <p class="hint">Откроется WhatsApp с черновиком. Сообщение не отправится само.</p>
+        <p>${extra}</p>
+      </section>
+    </main>`;
+}
+
+function renderHow() {
+  const { sections, points } = inspectionScope();
+  const items = orderedDirections()
+    .map((direction, index) => {
+      const title = directionTitle(direction.slug, direction.name);
+      const blurb = HOW_BLURBS[direction.slug] || "";
+      return `<li class="how-item">
+          <span class="how-num" aria-hidden="true">${index + 1}</span>
+          <div>
+            <h3>${escapeHtml(title)}</h3>
+            <p>${direction.checkpoints.length} пунктов. ${escapeHtml(blurb)}</p>
+          </div>
+        </li>`;
+    })
+    .join("");
+  return `${header()}
+    <main class="wrap service-page">
+      <nav class="crumb" aria-label="Навигация">
+        <a class="back" href="#/">На главную</a>
+        <span aria-hidden="true">/</span>
+        <span>Как проверяем</span>
+      </nav>
+      <h1>Как мы проверяем автомобиль</h1>
+      <p class="lead">Главное в сервисе — понятный оценочный лист: ${sections} разделов и ${points} пунктов, фото, схемы и отметки дефектов. Это не рыночная оценка и не автоматическая юридическая проверка.</p>
+      ${briefHonestNote()}
+      <ol class="how-list">${items}</ol>
+      <div class="row">
+        <a class="btn" href="#/c/primer-sedan">Открыть учебный оценочный лист</a>
+        <a class="btn ghost" href="#/proverit">Проверить выбранное авто</a>
+      </div>
+    </main>`;
+}
+
 function renderHome() {
   const cover = SAMPLE_CARS[0];
   const { sections, points } = inspectionScope();
@@ -1005,14 +1220,17 @@ function renderHome() {
           <p class="home-hook">${escapeHtml(HOME_HOOK)}</p>
           <p class="lead motto">${BRAND_TAGLINE}</p>
           <p class="support">${BRAND_SUPPORT}</p>
-          <a class="btn comic-cta" href="#catalog">Выбрать автомобиль</a>
+          <a class="btn comic-cta" href="#catalog">Выбрать из проверенных</a>
         </div>
       </section>
       <ul class="benefit-cards" aria-label="Зачем проверять автомобиль перед покупкой">${benefitItems}</ul>
+      ${journeyCardsHTML()}
       <section class="catalog-chapter" id="catalog" aria-labelledby="catalogTitle">
-        <h2 id="catalogTitle">Автомобили в демо</h2>
+        <h2 id="catalogTitle">Проверенные авто</h2>
+        <p class="hint">Учебные оценочные листы с оценками, схемами и фото. Это демо, а не витрина реальных продаж.</p>
         <div class="grid catalog">${SAMPLE_CARS.map(carCard).join("")}</div>
       </section>
+      ${compareStripHTML()}
     </main>`;
 }
 
@@ -1139,6 +1357,10 @@ function render() {
   let html = renderHome();
   if (isCarRoute(route)) html = renderCar(route.id, route);
   if (route.name === "admin") html = renderAdmin();
+  if (route.name === "podbor") html = renderPodbor();
+  if (route.name === "proverit") html = renderProverit();
+  if (route.name === "brief") html = renderBriefReview();
+  if (route.name === "how") html = renderHow();
   document.getElementById("app").innerHTML = html;
   document.title = pageTitle(route);
   bind();
@@ -1154,6 +1376,10 @@ function pageTitle(route) {
     const car = carMeta(route.id);
     if (car) return `${BRAND_NAME} — ${car.make} ${car.model}, ${car.year}`;
   }
+  if (route.name === "podbor") return `${BRAND_NAME} — Подобрать автомобиль`;
+  if (route.name === "proverit") return `${BRAND_NAME} — Проверить выбранное авто`;
+  if (route.name === "brief") return `${BRAND_NAME} — Учебная заявка`;
+  if (route.name === "how") return `${BRAND_NAME} — Как проверяем`;
   return BRAND_FULL;
 }
 
@@ -1696,6 +1922,7 @@ function bind() {
   });
   document.getElementById("resetDemo")?.addEventListener("click", () => {
     if (confirm("Сбросить учебные данные в этом браузере до исходных образцов?")) {
+      clearBrief();
       clearState();
       clearAllMedia()
         .catch(() => {})
@@ -1707,6 +1934,36 @@ function bind() {
     }
   });
   document.getElementById("printReport")?.addEventListener("click", () => window.print());
+  document.getElementById("serviceBrief")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const listingField = form.elements.namedItem("listingUrl");
+    const errBox = document.getElementById("briefFormError");
+    if (listingField) {
+      const urlErr = listingUrlError(listingField.value);
+      if (urlErr) {
+        if (errBox) {
+          errBox.hidden = false;
+          errBox.textContent = urlErr;
+        }
+        listingField.focus();
+        return;
+      }
+    }
+    const current = loadBrief();
+    const next = { ...current, journey: form.elements.namedItem("journey")?.value || current.journey };
+    if (form.elements.namedItem("budget")) next.budget = form.elements.namedItem("budget").value;
+    if (form.elements.namedItem("bodyPref")) next.bodyPref = form.elements.namedItem("bodyPref").value;
+    if (form.elements.namedItem("preferences")) next.preferences = form.elements.namedItem("preferences").value;
+    if (listingField) next.listingUrl = listingField.value;
+    if (form.elements.namedItem("notes")) next.notes = form.elements.namedItem("notes").value;
+    saveBrief(next);
+    location.hash = "#/brief";
+  });
+  document.getElementById("clearBriefOnly")?.addEventListener("click", () => {
+    clearBrief();
+    render();
+  });
   document.querySelectorAll("[data-assign]").forEach((select) => {
     select.addEventListener("change", () => {
       const carId = select.getAttribute("data-assign");

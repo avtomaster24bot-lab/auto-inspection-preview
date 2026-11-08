@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { computeScores, DEFAULT_SCORING_CONFIG } from "../js/scoring.js";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl, buildWhatsAppMessage, normalizeKzWhatsAppNumber } from "../js/whatsapp.js";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl, buildWhatsAppMessage, normalizeKzWhatsAppNumber, DEFAULT_WHATSAPP_DIGITS } from "../js/whatsapp.js";
 import { saveState, loadState, clearState, STORAGE_KEY } from "../js/storage.js";
 import { createDefaultState, DIRECTIONS, SAMPLE_CARS, liveScoresForCar, ensureCarShape } from "../js/data.js";
 
@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108l/);
-  assert.match(sw, /scheme\.js\?v=20261108l/);
+  assert.match(sw, /access\.js\?v=20261108m/);
+  assert.match(sw, /scheme\.js\?v=20261108m/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,8 +824,8 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108l/);
-  assert.match(sw, /diagrams\.js\?v=20261108l/);
+  assert.match(sw, /defects\.js\?v=20261108m/);
+  assert.match(sw, /diagrams\.js\?v=20261108m/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
 
@@ -835,7 +835,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(html, /css\/comic\.css\?v=20261108l/);
+  assert.match(html, /css\/comic\.css\?v=20261108m/);
   assert.match(comic, /@font-face/);
   assert.match(comic, /font-family:\s*"Russo One"/);
   assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
@@ -844,7 +844,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
   assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
   assert.match(comic, /U\+0400/);
-  assert.match(sw, /css\/comic\.css\?v=20261108l/);
+  assert.match(sw, /css\/comic\.css\?v=20261108m/);
   assert.match(sw, /fonts\/russo-one\.woff2/);
   assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
   assert.match(sw, /fonts\/manrope-variable\.woff2/);
@@ -917,8 +917,92 @@ test("home hero lists inspection usefulness without a fake price", () => {
   assert.match(headerFn, /class="brand-hook">\$\{BRAND_HOOK\}/);
   assert.equal(car.includes("HOME_HOOK"), false);
   assert.equal(car.includes("HOME_BENEFITS"), false);
-  assert.equal(app.includes("рыночн"), false);
+  assert.match(app, /Рыночную цену сервис сам не считает|не считает рыночную цену|не рыночная оценка/);
   assert.equal(app.includes("калькулятор цены"), false);
   assert.match(comic, /\.benefit-cards/);
   assert.match(comic, /\.home-hook/);
+});
+
+
+import {
+  BRIEF_STORAGE_KEY,
+  buildBriefWhatsAppMessage,
+  buildWhatsAppBriefUrl,
+  clearBrief,
+  listingUrlError,
+  loadBrief,
+  saveBrief,
+  sanitizeListingUrl,
+} from "../js/brief.js";
+test("service journeys have routes, a local brief and a manual WhatsApp draft", () => {
+  assert.equal(parseRoute("#/podbor").name, "podbor");
+  assert.equal(parseRoute("#/proverit").name, "proverit");
+  assert.equal(parseRoute("#/brief").name, "brief");
+  assert.equal(parseRoute("#/kak").name, "how");
+  assert.equal(canonicalHash({ name: "podbor" }), "#/podbor");
+  assert.equal(canonicalHash({ name: "proverit" }), "#/proverit");
+  assert.equal(canonicalHash({ name: "brief" }), "#/brief");
+  assert.equal(canonicalHash({ name: "how" }), "#/kak");
+  assert.equal(isCarRoute(parseRoute("#/proverit")), false);
+  assert.equal(parseRoute("#/inspect/primer-sedan/hodovaya").name, "inspect");
+
+  const store = {
+    data: {},
+    getItem(key) { return Object.hasOwn(this.data, key) ? this.data[key] : null; },
+    setItem(key, value) { this.data[key] = String(value); },
+    removeItem(key) { delete this.data[key]; },
+  };
+  saveState({ version: 1, cars: { keep: true } }, store);
+  const saved = saveBrief({
+    journey: "podbor",
+    budget: "до 8 млн",
+    bodyPref: "sedan",
+    preferences: "для семьи",
+    listingUrl: "javascript:alert(1)",
+    notes: "не брать",
+  }, store);
+  assert.equal(saved.listingUrl, "");
+  assert.equal(saved.budget, "до 8 млн");
+  assert.equal(JSON.parse(store.getItem(STORAGE_KEY)).cars.keep, true);
+  assert.ok(store.getItem(BRIEF_STORAGE_KEY));
+  assert.equal(loadBrief(store).preferences, "для семьи");
+  clearBrief(store);
+  assert.equal(store.getItem(BRIEF_STORAGE_KEY), null);
+  assert.equal(JSON.parse(store.getItem(STORAGE_KEY)).cars.keep, true);
+
+  assert.equal(listingUrlError("https://example.com/access/secret"), "В заявку нельзя вставлять служебные ссылки доступа");
+  assert.equal(sanitizeListingUrl("https://example.com/cars?id=12"), "https://example.com/cars?id=12");
+  const message = buildBriefWhatsAppMessage({
+    journey: "inspect",
+    listingUrl: "https://example.com/cars?id=12",
+    notes: "стук в подвеске",
+  });
+  assert.match(message, /учебная заявка/);
+  assert.match(message, /https:\/\/example.com\/cars\?id=12/);
+  assert.match(message, /стук в подвеске/);
+  assert.match(message, /не отправленная заявка/);
+  assert.equal(message.includes("заявка отправлена"), false);
+  const wa = buildWhatsAppBriefUrl({ journey: "podbor", budget: "до 8 млн" });
+  assert.equal(wa.startsWith(`https://wa.me/${DEFAULT_WHATSAPP_DIGITS}?text=`), true);
+  assert.match(wa, /%D0%B4%D0%BE%208%20%D0%BC%D0%BB%D0%BD/);
+
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
+  const home = app.slice(app.indexOf("function journeyCardsHTML"), app.indexOf("function compareStripHTML"));
+  assert.match(home, /href="#\/podbor"/);
+  assert.match(home, /href="#\/proverit"/);
+  assert.match(home, /href="#catalog"/);
+  assert.match(home, /Подобрать автомобиль/);
+  assert.match(home, /Проверить выбранное авто/);
+  assert.match(home, /Выбрать из проверенных/);
+  assert.match(app, /id="briefWhatsApp"/);
+  assert.match(app, /Сообщение не отправится само/);
+  assert.match(app, /нужна отдельная проверка/);
+  assert.match(app, /function renderHow/);
+  assert.match(app, /HOW_BLURBS/);
+  assert.match(sw, /brief\.js\?v=20261108m/);
+  assert.equal(app.includes("Автопрагмат"), false);
+  assert.equal(app.includes("autopragmat"), false);
+  assert.equal(app.includes("74951201738"), false);
+  assert.equal(app.includes("asafev"), false);
 });

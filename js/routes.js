@@ -11,6 +11,10 @@ export function parseRoute(hash = "") {
     return { name: "inspect", id: decodeURIComponent(parts[1]), dir: parts[2] ? decodeURIComponent(parts[2]) : null };
   }
   if (parts[0] === "admin") return { name: "admin", id: null, dir: null };
+  if (parts[0] === "podbor") return { name: "podbor", id: null, dir: null };
+  if (parts[0] === "proverit") return { name: "proverit", id: null, dir: null };
+  if (parts[0] === "brief") return { name: "brief", id: null, dir: null };
+  if (parts[0] === "kak") return { name: "how", id: null, dir: null };
   return { name: "home", id: null, dir: null };
 }
 
@@ -21,6 +25,10 @@ export function isCarRoute(route) {
 export function canonicalHash(route) {
   if (!route) return "#/";
   if (route.name === "admin") return "#/admin";
+  if (route.name === "podbor") return "#/podbor";
+  if (route.name === "proverit") return "#/proverit";
+  if (route.name === "brief") return "#/brief";
+  if (route.name === "how") return "#/kak";
   if (isCarRoute(route) && route.id) {
     return route.dir ? `#/c/${encodeURIComponent(route.id)}/${encodeURIComponent(route.dir)}` : `#/c/${encodeURIComponent(route.id)}`;
   }
