@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108n/);
-  assert.match(sw, /scheme\.js\?v=20261108n/);
+  assert.match(sw, /access\.js\?v=20261108o/);
+  assert.match(sw, /scheme\.js\?v=20261108o/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,8 +824,8 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108n/);
-  assert.match(sw, /diagrams\.js\?v=20261108n/);
+  assert.match(sw, /defects\.js\?v=20261108o/);
+  assert.match(sw, /diagrams\.js\?v=20261108o/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
 
@@ -835,7 +835,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(html, /css\/comic\.css\?v=20261108n/);
+  assert.match(html, /css\/comic\.css\?v=20261108o/);
   assert.match(comic, /@font-face/);
   assert.match(comic, /font-family:\s*"Russo One"/);
   assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
@@ -844,7 +844,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
   assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
   assert.match(comic, /U\+0400/);
-  assert.match(sw, /css\/comic\.css\?v=20261108n/);
+  assert.match(sw, /css\/comic\.css\?v=20261108o/);
   assert.match(sw, /fonts\/russo-one\.woff2/);
   assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
   assert.match(sw, /fonts\/manrope-variable\.woff2/);
@@ -910,7 +910,9 @@ test("home hero lists inspection usefulness without a fake price", () => {
   const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function unpublishedBlock"));
   const car = app.slice(app.indexOf("function renderCar"), app.indexOf("function renderAdmin"));
   const headerFn = app.slice(app.indexOf("function header"), app.indexOf("function statusIconSVG"));
-  assert.match(home, /id="welcomeTitle">\$\{BRAND_HOOK\}/);
+  assert.match(home, /id="welcomeTitle">Подберём автомобиль и покажем его состояние до покупки/);
+  assert.match(home, /href="#\/podbor"/);
+  assert.match(home, /href="#\/proverit"/);
   assert.match(home, /HOME_HOOK/);
   assert.match(home, /HOME_BENEFITS/);
   assert.match(home, /class="lead motto">\$\{BRAND_TAGLINE\}/);
@@ -1006,7 +1008,7 @@ test("service journeys have routes, a local brief and a manual WhatsApp draft", 
   assert.match(app, /нужна отдельная проверка/);
   assert.match(app, /function renderHow/);
   assert.match(app, /HOW_BLURBS/);
-  assert.match(sw, /brief\.js\?v=20261108n/);
+  assert.match(sw, /brief\.js\?v=20261108o/);
   assert.equal(app.includes("Автопрагмат"), false);
   assert.equal(app.includes("autopragmat"), false);
   assert.equal(app.includes("74951201738"), false);
@@ -1066,4 +1068,34 @@ test("brief currency round-trips and leaves legacy briefs unspecified", () => {
   assert.match(app, /addEventListener\("invalid"/);
   assert.match(app, /addEventListener\("input"/);
   assert.match(app, /name="currency"/);
+});
+
+test("landing follows a photo-led service sequence without invented social proof", () => {
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+  const css = readFileSync(fileURLToPath(new URL("../css/landing.css", import.meta.url)), "utf8");
+  const home = app.slice(app.indexOf("function heroSliderHTML"), app.indexOf("function unpublishedBlock"));
+  assert.match(html, /css\/landing\.css\?v=/);
+  assert.match(css, /body\.landing-shell/);
+  assert.match(css, /#191919|#171717/);
+  assert.match(css, /#4da3ff/);
+  assert.match(css, /border-radius:\s*2px/);
+  assert.match(home, /Заказать подбор/);
+  assert.match(home, /Покупка подержанного автомобиля — это риск/);
+  assert.match(home, /Проблемы с документами/);
+  assert.match(home, /Скрытые ДТП/);
+  assert.match(home, /Техническое состояние/);
+  assert.match(home, /Изучим рынок и найдём конкретную модель/);
+  assert.match(home, /Проведём полную диагностику и порекомендуем лучший авто/);
+  assert.match(home, /<h3>Запрос<\/h3>/);
+  assert.match(home, /<h3>Что сделали<\/h3>/);
+  assert.match(home, /<h3>Наше мнение<\/h3>/);
+  assert.match(home, /Учебный пример · демо/);
+  assert.match(home, /id="heroSlider"/);
+  assert.match(home, /inspect-cat/);
+  assert.equal(home.includes("10000+"), false);
+  assert.equal(home.includes("comic-sticker"), false);
+  assert.equal(home.includes("speech-bubble"), false);
+  assert.equal(app.includes("Автопрагмат"), false);
+  assert.match(app, /document\.body\.classList\.toggle\("landing-shell"/);
 });

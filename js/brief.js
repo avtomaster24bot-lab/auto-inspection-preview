@@ -1,5 +1,5 @@
-import { getStorage } from "./storage.js?v=20261108n";
-import { DEFAULT_WHATSAPP_DIGITS, normalizeKzWhatsAppNumber } from "./whatsapp.js?v=20261108n";
+import { getStorage } from "./storage.js?v=20261108o";
+import { DEFAULT_WHATSAPP_DIGITS, normalizeKzWhatsAppNumber } from "./whatsapp.js?v=20261108o";
 
 export const BRIEF_STORAGE_KEY = "am24-tradein-demo-brief-v1";
 

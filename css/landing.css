@@ -1,0 +1,782 @@
+/* Hidden outside the landing shell so report pages keep a simple header. */
+.nav-toggle,
+.header-request { display: none; }
+
+/* Outer landing: restrained dark graphite, photo-led, rectangular blue CTAs.
+   Scoped to body.landing-shell so the inner report can keep its own theme. */
+
+body.landing-shell {
+  --landing-bg: #191919;
+  --landing-panel: #242424;
+  --landing-text: #f3f3f3;
+  --landing-muted: #b0b0b0;
+  --landing-blue: #4da3ff;
+  --landing-blue-deep: #2f8ff2;
+  --landing-line: rgba(255, 255, 255, 0.12);
+  background: var(--landing-bg);
+  background-image: none;
+  color: var(--landing-text);
+  font-family: "Manrope", "Segoe UI", "Noto Sans", "Helvetica Neue", sans-serif;
+  font-weight: 500;
+}
+
+body.landing-shell::before {
+  display: none;
+}
+
+body.landing-shell .badge {
+  background: #141414;
+  color: #d7d7d7;
+  letter-spacing: 0;
+}
+
+body.landing-shell .badge-more p {
+  color: #c0c0c0;
+}
+
+body.landing-shell h1,
+body.landing-shell h2,
+body.landing-shell h3,
+body.landing-shell .logo,
+body.landing-shell .verdict-score,
+body.landing-shell .score-hero strong,
+body.landing-shell .dir-score {
+  font-family: "Manrope", "Segoe UI", "Noto Sans", sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+body.landing-shell .tag,
+body.landing-shell .brand-sub,
+body.landing-shell .brand-hook,
+body.landing-shell .lead.motto,
+body.landing-shell .support,
+body.landing-shell .btn {
+  font-family: "Manrope", "Segoe UI", "Noto Sans", sans-serif;
+}
+
+body.landing-shell .wrap {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto 4.5rem;
+}
+
+body.landing-shell .top {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem 1.5rem;
+  padding: 0.85rem 1.35rem;
+  background: #171717;
+  color: #f3f3f3;
+  border-bottom: 1px solid var(--landing-line);
+  box-shadow: none;
+}
+
+body.landing-shell .logo {
+  color: var(--landing-blue);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+body.landing-shell .brand-sub {
+  margin: 0.15rem 0 0;
+  color: #c5c5c5;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+body.landing-shell .brand-hook {
+  margin: 0.2rem 0 0;
+  max-width: min(100%, 20rem);
+  overflow-wrap: anywhere;
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+body.landing-shell .nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+body.landing-shell .nav-toggle-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  margin: 5px auto;
+  background: #fff;
+}
+
+body.landing-shell #siteNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.05rem;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+body.landing-shell #siteNav a {
+  color: #ececec;
+  font-weight: 500;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+body.landing-shell #siteNav a:hover,
+body.landing-shell #siteNav a:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+body.landing-shell .mode-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  color: #ddd;
+  background: transparent;
+}
+
+body.landing-shell .top .btn.ghost.header-action,
+body.landing-shell .top .btn.header-action {
+  background: transparent;
+  color: #eee;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+body.landing-shell .top .btn.ghost.header-action:hover,
+body.landing-shell .top .btn.header-action:hover,
+body.landing-shell .top .btn.ghost.header-action:focus-visible,
+body.landing-shell .top .btn.header-action:focus-visible {
+  background: transparent;
+  color: #fff;
+  border-color: var(--landing-blue);
+  transform: none;
+}
+
+body.landing-shell .header-request {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.55rem 1.15rem;
+  border: 1px solid var(--landing-blue);
+  border-radius: 2px;
+  background: transparent;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+body.landing-shell .header-request:hover,
+body.landing-shell .header-request:focus-visible {
+  background: rgba(77, 163, 255, 0.12);
+  transform: none;
+}
+
+body.landing-shell .btn {
+  border: 0;
+  border-radius: 2px;
+  background: var(--landing-blue);
+  color: #fff;
+  box-shadow: none;
+  font-weight: 600;
+  padding: 0.95rem 1.7rem;
+}
+
+body.landing-shell .btn:hover,
+body.landing-shell .btn:focus-visible {
+  background: var(--landing-blue-deep);
+  transform: none;
+  box-shadow: none;
+}
+
+body.landing-shell .btn:active {
+  transform: none;
+  box-shadow: none;
+}
+
+body.landing-shell .btn.ghost,
+body.landing-shell .file-btn {
+  background: transparent;
+  color: #fff;
+  border: 1px solid var(--landing-blue);
+}
+
+body.landing-shell .btn.ghost:hover,
+body.landing-shell .file-btn:hover {
+  background: rgba(77, 163, 255, 0.12);
+}
+
+body.landing-shell .btn.wa {
+  background: #128c4b;
+  width: auto;
+}
+
+body.landing-shell .landing-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(100%, 280px);
+  min-height: 52px;
+  padding: 0.95rem 1.8rem;
+  border-radius: 2px;
+  background: var(--landing-blue);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+body.landing-shell .landing-cta-primary:hover,
+body.landing-shell .landing-cta-primary:focus-visible {
+  background: var(--landing-blue-deep);
+}
+
+body.landing-shell .landing-cta-secondary {
+  display: inline-block;
+  margin: 0.85rem 0 0;
+  color: #d7d7d7;
+  font-size: 0.95rem;
+}
+
+body.landing-shell .landing-cta-secondary a {
+  color: var(--landing-blue);
+}
+
+body.landing-shell .landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: 2.4rem 3rem;
+  align-items: center;
+  padding: 3.4rem 0 2.6rem;
+}
+
+body.landing-shell .landing-hero h1 {
+  margin: 0 0 1.15rem;
+  font-size: clamp(1.85rem, 3.6vw, 2.55rem);
+  font-weight: 600;
+  line-height: 1.22;
+  color: #fff;
+}
+
+body.landing-shell .home-hook {
+  max-width: 34rem;
+  margin: 0 0 0.85rem;
+  color: #d8d8d8;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+body.landing-shell .lead.motto {
+  max-width: 34rem;
+  margin: 0 0 1.5rem;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+body.landing-shell .landing-hero-note .support { margin: 0; color: inherit; }
+
+body.landing-shell .landing-hero-note {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  margin: 1.7rem 0 0;
+  max-width: 28rem;
+  color: var(--landing-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+body.landing-shell .landing-icon-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  background: var(--landing-blue);
+  color: #fff;
+}
+
+body.landing-shell .landing-slider-stage {
+  background: #111;
+}
+
+body.landing-shell .landing-slide {
+  margin: 0;
+}
+
+body.landing-shell .landing-slide img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 11;
+  object-fit: cover;
+  object-position: center;
+}
+
+body.landing-shell .landing-slide figcaption {
+  margin: 0.85rem 0 0;
+  color: #d5d5d5;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+body.landing-shell .landing-slide figcaption strong {
+  display: block;
+  margin: 0 0 0.25rem;
+  color: #fff;
+  font-weight: 650;
+}
+
+body.landing-shell .landing-slide figcaption a {
+  color: var(--landing-blue);
+}
+
+body.landing-shell .landing-dots {
+  display: flex;
+  gap: 0.45rem;
+  justify-content: center;
+  margin: 1rem 0 0;
+}
+
+body.landing-shell .landing-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid #fff;
+  border-radius: 1px;
+  background: transparent;
+  cursor: pointer;
+}
+
+body.landing-shell .landing-dot.is-active {
+  background: var(--landing-blue);
+  border-color: var(--landing-blue);
+}
+
+body.landing-shell .landing-section {
+  padding: 3.4rem 0 0;
+}
+
+body.landing-shell .landing-section h2 {
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-weight: 600;
+  color: #fff;
+}
+
+body.landing-shell .section-rule {
+  border: 0;
+  border-top: 1px solid var(--landing-line);
+  margin: 0 0 1.1rem;
+}
+
+body.landing-shell .landing-section > .lead,
+body.landing-shell .landing-copy p {
+  max-width: 36rem;
+  color: var(--landing-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+body.landing-shell .risk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.15rem;
+  margin-top: 1.6rem;
+}
+
+body.landing-shell .risk-copy {
+  align-self: center;
+  padding-right: 1rem;
+}
+
+body.landing-shell .risk-copy h3 {
+  margin: 0 0 0.55rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+body.landing-shell .photo-card {
+  margin: 0;
+  background: var(--landing-panel);
+}
+
+body.landing-shell .photo-card figure {
+  margin: 0;
+  position: relative;
+}
+
+body.landing-shell .photo-card img {
+  display: block;
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+}
+
+body.landing-shell .photo-card figcaption,
+body.landing-shell .photo-card-docs figcaption {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  margin: 0;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 650;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+}
+
+body.landing-shell .photo-card > p {
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  color: var(--landing-muted);
+  font-size: 0.9rem;
+}
+
+body.landing-shell .photo-card-docs {
+  min-height: 210px;
+  background:
+    linear-gradient(160deg, rgba(77, 163, 255, 0.16), transparent 46%),
+    repeating-linear-gradient(180deg, #2a2a2a 0 28px, #232323 28px 29px);
+}
+
+body.landing-shell .search-grid,
+body.landing-shell .landing-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 2rem 2.4rem;
+  align-items: center;
+}
+
+body.landing-shell .check-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.15rem 1.4rem;
+  margin: 1.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.landing-shell .check-list li {
+  position: relative;
+  padding: 0 0 0 1.35rem;
+  color: var(--landing-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+body.landing-shell .check-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.45rem;
+  height: 0.28rem;
+  border-left: 2px solid var(--landing-blue);
+  border-bottom: 2px solid var(--landing-blue);
+  transform: rotate(-45deg);
+}
+
+body.landing-shell .search-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+body.landing-shell .search-mosaic a:first-child {
+  grid-column: 1 / -1;
+}
+
+body.landing-shell .search-mosaic img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+
+body.landing-shell .search-mosaic a:first-child img {
+  height: 190px;
+}
+
+body.landing-shell .evidence-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+body.landing-shell .evidence-note {
+  max-width: 16rem;
+  color: var(--landing-muted);
+  font-size: 0.88rem;
+}
+
+body.landing-shell .evidence-cards,
+body.landing-shell .benefit-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.landing-shell .evidence-cards .photo-card img {
+  height: 230px;
+}
+
+body.landing-shell .benefit-card {
+  background: var(--landing-panel);
+  border: 0;
+  box-shadow: none;
+  padding: 1rem 1.1rem;
+  color: #e8e8e8;
+}
+
+body.landing-shell .benefit-num {
+  display: inline-flex;
+  width: 1.6rem;
+  height: 1.6rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 0.55rem;
+  background: var(--landing-blue);
+  color: #fff;
+  border-radius: 2px;
+  font-size: 0.85rem;
+}
+
+body.landing-shell .demo-case {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 1.6rem 2rem;
+  align-items: start;
+}
+
+body.landing-shell .demo-case img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 11;
+  object-fit: cover;
+}
+
+body.landing-shell .demo-badge {
+  display: inline-block;
+  margin: 0 0 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--landing-blue);
+  color: var(--landing-blue);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+body.landing-shell .case-steps {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 1.2rem;
+}
+
+body.landing-shell .case-steps h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  color: #fff;
+}
+
+body.landing-shell .case-steps p {
+  margin: 0;
+  color: var(--landing-muted);
+}
+
+body.landing-shell .two-step-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1rem;
+  align-items: center;
+  margin-top: 1.2rem;
+}
+
+body.landing-shell .inspect-cats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.landing-shell .inspect-cat {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.85rem;
+  align-items: center;
+  background: var(--landing-panel);
+  padding: 0.7rem 0.85rem;
+}
+
+body.landing-shell .inspect-cat img {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+}
+
+body.landing-shell .inspect-cat h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+body.landing-shell .inspect-cat p {
+  margin: 0;
+  color: var(--landing-muted);
+  font-size: 0.88rem;
+}
+
+body.landing-shell .catalog-chapter,
+body.landing-shell .compare-strip,
+body.landing-shell .journey-board {
+  padding-top: 3.2rem;
+}
+
+body.landing-shell .card,
+body.landing-shell .comic-card,
+body.landing-shell .compare-card,
+body.landing-shell .journey-card,
+body.landing-shell .service-form,
+body.landing-shell .brief-review,
+body.landing-shell .how-item {
+  background: var(--landing-panel);
+  border: 0;
+  border-radius: 2px;
+  box-shadow: none;
+  color: var(--landing-text);
+}
+
+body.landing-shell .journey-card-primary {
+  background: #20364d;
+}
+
+body.landing-shell .card .meta,
+body.landing-shell .card .status,
+body.landing-shell .card p,
+body.landing-shell .compare-card p,
+body.landing-shell .journey-card p,
+body.landing-shell .hint,
+body.landing-shell .service-honest,
+body.landing-shell .crumb,
+body.landing-shell .crumb a,
+body.landing-shell .back {
+  color: var(--landing-muted);
+}
+
+body.landing-shell .crumb a,
+body.landing-shell .back {
+  color: var(--landing-blue);
+}
+
+body.landing-shell .service-form input,
+body.landing-shell .service-form select,
+body.landing-shell .service-form textarea,
+body.landing-shell .brief-review input {
+  background: #111;
+  color: #fff;
+  border: 1px solid #3a3a3a;
+  border-radius: 2px;
+}
+
+body.landing-shell .score-hero {
+  background: #1d1d1d;
+  border: 1px solid var(--landing-line);
+  box-shadow: none;
+}
+
+body.landing-shell .report-shell {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  body.landing-shell .top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.landing-shell .nav-toggle {
+    display: block;
+  }
+
+  body.landing-shell .header-request {
+    display: none;
+  }
+
+  body.landing-shell #siteNav {
+    display: none;
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.4rem 0 0.8rem;
+  }
+
+  body.landing-shell #siteNav.is-open {
+    display: flex;
+  }
+
+  body.landing-shell .landing-hero,
+  body.landing-shell .risk-grid,
+  body.landing-shell .search-grid,
+  body.landing-shell .landing-split,
+  body.landing-shell .evidence-head,
+  body.landing-shell .evidence-cards,
+  body.landing-shell .benefit-cards,
+  body.landing-shell .demo-case,
+  body.landing-shell .inspect-cats,
+  body.landing-shell .check-list {
+    grid-template-columns: 1fr;
+  }
+
+  body.landing-shell .landing-hero {
+    padding: 1.8rem 0 1.4rem;
+    text-align: center;
+    gap: 1.4rem;
+  }
+
+  body.landing-shell .home-hook,
+  body.landing-shell .lead.motto,
+  body.landing-shell .landing-hero-note {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  body.landing-shell .landing-cta-primary {
+    width: 100%;
+  }
+
+  body.landing-shell .landing-hero-note {
+    text-align: left;
+  }
+
+  body.landing-shell .photo-card img,
+  body.landing-shell .evidence-cards .photo-card img {
+    height: 200px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.landing-shell * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

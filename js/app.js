@@ -1,6 +1,6 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108n";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108n";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108n";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108o";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108o";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108o";
 import {
   HOW_BLURBS,
   bodyPrefLabel,
@@ -11,16 +11,16 @@ import {
   listingUrlError,
   loadBrief,
   saveBrief,
-} from "./brief.js?v=20261108n";
-import { formatRuCount } from "./format.js?v=20261108n";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108n";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108n";
-import { directionThumb } from "./icons.js?v=20261108n";
-import { folderKey } from "./folder.js?v=20261108n";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108n";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108n";
-import { schemeForCar } from "./scheme.js?v=20261108n";
-import { diagramsForDirection } from "./diagrams.js?v=20261108n";
+} from "./brief.js?v=20261108o";
+import { formatRuCount } from "./format.js?v=20261108o";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108o";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108o";
+import { directionThumb } from "./icons.js?v=20261108o";
+import { folderKey } from "./folder.js?v=20261108o";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108o";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108o";
+import { schemeForCar } from "./scheme.js?v=20261108o";
+import { diagramsForDirection } from "./diagrams.js?v=20261108o";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -34,7 +34,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108n";
+} from "./defects.js?v=20261108o";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -44,8 +44,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108n";
-import { ASSET_VERSION } from "./version.js?v=20261108n";
+} from "./media.js?v=20261108o";
+import { ASSET_VERSION } from "./version.js?v=20261108o";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -232,13 +232,21 @@ function header() {
       <p class="brand-sub">${BRAND_SUBLINE}</p>
       <p class="brand-hook">${BRAND_HOOK}</p>
     </div>
-    <nav>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="siteNav" aria-label="Открыть меню">
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+    </button>
+    <nav id="siteNav">
       <a href="#/">Все автомобили</a>
       <a href="#/kak">Как проверяем</a>
+      <a href="#/podbor">Подбор</a>
+      <a href="#/proverit">Проверить авто</a>
       <button type="button" class="mode-toggle" id="modeToggle" aria-haspopup="dialog">Демо-режим: ${escapeHtml(roleLabel())}</button>
       <button type="button" class="btn ghost header-action" id="sharePage">Поделиться</button>
       <button type="button" class="btn ghost header-action" id="installApp">Установить на телефон</button>
     </nav>
+    <a class="btn header-request" href="#/podbor">Оставить заявку</a>
     <p id="actionStatus" class="hint action-status" role="status" hidden></p>
     <dialog id="iosInstallHelp" class="mode-dialog">
       <h2>Как добавить на телефон</h2>
@@ -1220,32 +1228,175 @@ function renderHow() {
     </main>`;
 }
 
+
+function photoCardHTML(src, alt, title, text) {
+  const image = src
+    ? `<img src="${src}" alt="${escapeHtml(alt)}" width="800" height="500">`
+    : "";
+  return `<article class="photo-card${src ? "" : " photo-card-plain"}">
+      <figure class="${src ? "" : "photo-card-docs"}">
+        ${image}
+        <figcaption>${escapeHtml(title)}</figcaption>
+      </figure>
+      ${text ? `<p>${escapeHtml(text)}</p>` : ""}
+    </article>`;
+}
+
+function heroSliderHTML() {
+  const slides = SAMPLE_CARS.map((car, index) => `<figure class="landing-slide" data-slide="${index}"${index === 0 ? "" : " hidden"}>
+        <a href="#/c/${car.id}">
+          <img src="${car.image}" alt="${escapeHtml(car.imageAlt || `${car.make} ${car.model}`)}" width="960" height="640">
+        </a>
+        <figcaption>
+          <strong>Учебный пример отчёта: ${escapeHtml(car.make)} ${escapeHtml(car.model)}, ${car.year}</strong>
+          <span>${escapeHtml(car.label)}. Учебная иллюстрация, не фото реального осмотра и не заказ клиента.</span>
+          <a href="#/c/${car.id}">Открыть демо-отчёт</a>
+        </figcaption>
+      </figure>`).join("");
+  const dots = SAMPLE_CARS.map((car, index) => `<button type="button" class="landing-dot${index === 0 ? " is-active" : ""}" data-slide-to="${index}" aria-label="Показать учебный пример ${escapeHtml(car.model)}" aria-current="${index === 0 ? "true" : "false"}"></button>`).join("");
+  return `<div class="landing-slider" id="heroSlider">
+      <div class="landing-slider-stage">${slides}</div>
+      <div class="landing-dots">${dots}</div>
+    </div>`;
+}
+
+function searchBenefitsHTML() {
+  const items = [
+    "Поможем определиться с моделью, учитывая задачу, бюджет и что есть на рынке.",
+    "Отберём объявления и отсеем варианты, которые не стоит смотреть.",
+    "Подскажем, на что обратить внимание в конкретном объявлении до осмотра.",
+    "Соберём понятный запрос на подбор — без выдуманной рыночной цены.",
+  ];
+  return `<ul class="check-list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+function demoCaseHTML() {
+  const car = SAMPLE_CARS[0];
+  const overview = overviewFor(car.id);
+  const progress = inspectionProgress(overview.scores, { unpublished: overview.unpublished });
+  const { sections, points } = inspectionScope();
+  return `<section class="landing-section" aria-labelledby="demoCaseTitle">
+      <div class="demo-case">
+        <figure>
+          <img src="${car.image}" alt="${escapeHtml(car.imageAlt || `${car.make} ${car.model}`)}" width="960" height="640">
+        </figure>
+        <div>
+          <p class="demo-badge">Учебный пример · демо</p>
+          <h2 id="demoCaseTitle">${escapeHtml(car.make)} ${escapeHtml(car.model)}, ${car.year}</h2>
+          <p class="lead">${escapeHtml(car.label)}. Это синтетический образец, не история реального клиента и не витрина продажи.</p>
+          <div class="case-steps">
+            <div>
+              <h3>Запрос</h3>
+              <p>Учебный сценарий: понять состояние седана до покупки. ${escapeHtml(car.summary)}</p>
+            </div>
+            <div>
+              <h3>Что сделали</h3>
+              <p>Прошли ${formatRuCount(sections, "раздел", "раздела", "разделов")} и ${formatRuCount(points, "пункт", "пункта", "пунктов")} оценочного листа, отметили дефекты на схемах.</p>
+            </div>
+            <div>
+              <h3>Наше мнение</h3>
+              <p>${escapeHtml(progress.completionLabel)}: ${escapeHtml(progress.scoreText)}. Рыночную цену сервис сам не считает.</p>
+              ${statusPillHTML(progress)}
+            </div>
+          </div>
+          <a class="btn" href="#/c/${car.id}">Открыть учебный отчёт</a>
+        </div>
+      </div>
+    </section>`;
+}
+
+function inspectionCategoriesHTML() {
+  const { sections, points } = inspectionScope();
+  const items = orderedDirections()
+    .map((direction) => {
+      const title = directionTitle(direction.slug, direction.name);
+      const blurb = HOW_BLURBS[direction.slug] || "";
+      return `<li class="inspect-cat">
+          ${directionThumb(direction.slug)}
+          <div>
+            <h3>${escapeHtml(title)}</h3>
+            <p>${formatRuCount(direction.checkpoints.length, "пункт", "пункта", "пунктов")}. ${escapeHtml(blurb)}</p>
+          </div>
+        </li>`;
+    })
+    .join("");
+  return `<section class="landing-section" aria-labelledby="inspectCatsTitle">
+      <h2 id="inspectCatsTitle">Что проверяем</h2>
+      <p class="lead">${formatRuCount(sections, "раздел", "раздела", "разделов")} проверки и ${formatRuCount(points, "пункт", "пункта", "пунктов")}: оценки, фото, схемы и замечания. Это не рыночная оценка и не автоматическая юридическая проверка.</p>
+      <ol class="inspect-cats">${items}</ol>
+      <p class="two-step-cta"><a class="btn ghost" href="#/kak">Как мы проверяем</a></p>
+    </section>`;
+}
+
 function renderHome() {
-  const cover = SAMPLE_CARS[0];
   const { sections, points } = inspectionScope();
   const benefitItems = HOME_BENEFITS.map((item, index) => `<li class="benefit-card">
         <span class="benefit-num" aria-hidden="true">${index + 1}</span>
         <p>${escapeHtml(item)}</p>
       </li>`).join("");
+  const mosaic = SAMPLE_CARS.map((car) => `<a href="#/c/${car.id}"><img src="${car.image}" alt="${escapeHtml(car.imageAlt || `${car.make} ${car.model}`)}" width="640" height="400"></a>`).join("");
   return `${header()}
-    <main class="wrap">
-      <section class="welcome-hero" aria-labelledby="welcomeTitle">
-        <div class="comic-cover">
-          ${carPhoto(cover, "comic-cover-art")}
-          <p class="comic-sticker comic-sticker-gold">${formatRuCount(sections, "раздел", "раздела", "разделов")} проверки</p>
-          <p class="comic-sticker comic-sticker-cyan">${formatRuCount(points, "пункт", "пункта", "пунктов")}</p>
-        </div>
-        <div class="welcome-copy">
-          <p class="chapter-kicker">${escapeHtml(BRAND_FULL)}</p>
-          <h1 id="welcomeTitle">${BRAND_HOOK}</h1>
+    <main class="wrap landing-main">
+      <section class="landing-hero" aria-labelledby="welcomeTitle">
+        <div class="landing-hero-copy">
+          <h1 id="welcomeTitle">Подберём автомобиль и покажем его состояние до покупки</h1>
           <p class="home-hook">${escapeHtml(HOME_HOOK)}</p>
           <p class="lead motto">${BRAND_TAGLINE}</p>
-          <p class="support">${BRAND_SUPPORT}</p>
-          <a class="btn comic-cta" href="#catalog">Выбрать из проверенных</a>
+          <a class="landing-cta-primary" href="#/podbor">Заказать подбор</a>
+          <p class="landing-cta-secondary">Уже нашли объявление? <a href="#/proverit">Проверить выбранное авто</a></p>
+          <div class="landing-hero-note">
+            <span class="landing-icon-search" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="6.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <p class="support">${BRAND_SUPPORT}</p>
+          </div>
+        </div>
+        ${heroSliderHTML()}
+      </section>
+      <section class="landing-section" aria-labelledby="riskTitle">
+        <h2 id="riskTitle">Покупка подержанного автомобиля — это риск</h2>
+        <hr class="section-rule">
+        <p class="lead">На вторичном рынке встречаются скрытые дефекты, следы ремонта после ДТП и проблемы, которые не видны по красивому объявлению. Без проверки легко купить чужие проблемы вместе с машиной.</p>
+        <div class="risk-grid">
+          <div class="risk-copy">
+            <h3>Какие сюрпризы встречаются чаще</h3>
+            <p>Документы, скрытые последствия аварий и техническое состояние легко прикрыть удачными фото. Мы помогаем увидеть состояние машины по оценочному листу. Юридическую чистоту, залог, угон и VIN этот сервис автоматически не проверяет — для этого нужна отдельная проверка.</p>
+          </div>
+          ${photoCardHTML("", "", "Проблемы с документами", "Залог, ограничения и юридическую историю нужно проверять отдельно. Здесь этого автоматического сервиса нет.")}
+          ${photoCardHTML("images/diagrams/geometry-unibody.jpg", "Учебная схема кузова и силовых элементов автомобиля", "Скрытые ДТП", "На схемах отмечаем следы ремонта, геометрию и то, что требует внимания.")}
+          ${photoCardHTML("images/diagrams/engine-bay.jpg", "Учебное фото моторного отсека", "Техническое состояние", "Смотрим узлы по пунктам проверки, а не по обещаниям объявления.")}
         </div>
       </section>
-      <ul class="benefit-cards" aria-label="Зачем проверять автомобиль перед покупкой">${benefitItems}</ul>
-      ${journeyCardsHTML()}
+      <section class="landing-section" aria-labelledby="searchTitle">
+        <div class="search-grid">
+          <div>
+            <h2 id="searchTitle">Изучим рынок и найдём конкретную модель</h2>
+            <p class="lead">Опишите задачу и бюджет — подготовим учебную заявку на подбор. Это черновик в этом браузере, а не обещание любой премиум-марки и не автоматическая оценка рынка.</p>
+            ${searchBenefitsHTML()}
+          </div>
+          <div class="search-mosaic" aria-label="Учебные примеры автомобилей">${mosaic}</div>
+        </div>
+      </section>
+      <section class="landing-section" aria-labelledby="evidenceTitle">
+        <div class="evidence-head">
+          <h2 id="evidenceTitle">Проведём полную диагностику и порекомендуем лучший авто</h2>
+          <p class="evidence-note">Главное — ${formatRuCount(sections, "раздел", "раздела", "разделов")} и ${formatRuCount(points, "пункт", "пункта", "пунктов")} оценочного листа. Это не рыночная оценка.</p>
+        </div>
+        <div class="evidence-cards">
+          ${photoCardHTML("images/diagrams/hodovaya-chassis.jpg", "Учебная схема ходовой части автомобиля", "Осмотр по пунктам", "На осмотре проходим узлы и системы и фиксируем, что в порядке, а что требует внимания.")}
+          ${photoCardHTML("images/diagrams/geometry-chassis.jpg", "Учебная схема геометрии и днища автомобиля", "Следы и дефекты на схемах", "Отмечаем замечания на схемах, чтобы было видно, где искать проблему.")}
+          ${photoCardHTML("images/car-sedan.webp", "Учебная иллюстрация седана, не фото реального осмотра", "Понятный учебный отчёт", "Оценки, фото и замечания собраны в открытом демо-отчёте — без выдуманной цены продажи.")}
+        </div>
+        <ul class="benefit-cards" aria-label="Зачем проверять автомобиль перед покупкой">${benefitItems}</ul>
+      </section>
+      ${demoCaseHTML()}
+      <section class="landing-section" aria-labelledby="ctaTitle">
+        <h2 id="ctaTitle">Готовы начать</h2>
+        <p class="lead">Оставьте учебную заявку на подбор или пришлите ссылку на уже найденное объявление.</p>
+        <div class="two-step-cta">
+          <a class="landing-cta-primary" href="#/podbor">Заказать подбор</a>
+          <a class="btn ghost" href="#/proverit">Проверить выбранное авто</a>
+        </div>
+      </section>
+      ${inspectionCategoriesHTML()}
       <section class="catalog-chapter" id="catalog" aria-labelledby="catalogTitle">
         <h2 id="catalogTitle">Проверенные авто</h2>
         <p class="hint">Учебные оценочные листы с оценками, схемами и фото. Это демо, а не витрина реальных продаж.</p>
@@ -1384,6 +1535,9 @@ function render() {
   if (route.name === "how") html = renderHow();
   document.getElementById("app").innerHTML = html;
   document.title = pageTitle(route);
+  const landing = !isCarRoute(route) && route.name !== "admin";
+  document.body.classList.toggle("landing-shell", landing);
+  document.body.classList.toggle("report-shell", !landing);
   bind();
   if (isCarRoute(route) && route.id && route.dir) {
     const carState = state.cars[route.id];
@@ -1907,7 +2061,36 @@ function bindSchemeZoom() {
   });
 }
 
+function bindLandingChrome() {
+  const toggle = document.getElementById("navToggle");
+  const nav = document.getElementById("siteNav");
+  toggle?.addEventListener("click", () => {
+    const open = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!open));
+    toggle.setAttribute("aria-label", open ? "Открыть меню" : "Закрыть меню");
+    nav?.classList.toggle("is-open", !open);
+  });
+  const slider = document.getElementById("heroSlider");
+  if (!slider) return;
+  const slides = [...slider.querySelectorAll("[data-slide]")];
+  const dots = [...slider.querySelectorAll("[data-slide-to]")];
+  const show = (index) => {
+    slides.forEach((slide, i) => {
+      slide.hidden = i !== index;
+    });
+    dots.forEach((dot, i) => {
+      const on = i === index;
+      dot.classList.toggle("is-active", on);
+      dot.setAttribute("aria-current", on ? "true" : "false");
+    });
+  };
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => show(Number(dot.getAttribute("data-slide-to"))));
+  });
+}
+
 function bind() {
+  bindLandingChrome();
   bindSheetDialog();
   bindSchemeZoom();
   bindFieldRoot(document);
