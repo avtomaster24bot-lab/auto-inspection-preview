@@ -434,7 +434,7 @@ test("public preview uses Авто Лидер brand and clarity slogan without t
 
 
 import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore } from "../js/access.js";
-import { carTopSvg, carSideSvg } from "../js/scheme.js";
+import { schemeForCar, schemeKindForCar, listSchemeAssets } from "../js/scheme.js";
 
 test("all seven category buttons stay visible and master edits stay assigned-only", () => {
   const state = createDefaultState();
@@ -485,11 +485,13 @@ test("all seven category buttons stay visible and master edits stay assigned-onl
   assert.match(app, /canEditDir\(/);
   assert.match(app, /Вид сверху/);
   assert.match(app, /Вид сбоку/);
-  assert.match(app, /carTopSvg/);
-  assert.match(app, /carSideSvg/);
-  assert.match(scheme, /viewBox="0 0 760 360"/);
-  assert.match(scheme, /viewBox="0 0 760 300"/);
-  assert.match(scheme, /scheme-hit/);
+  assert.match(app, /schemeForCar/);
+  assert.equal(app.includes("carTopSvg"), false);
+  assert.equal(app.includes("carSideSvg"), false);
+  assert.equal(scheme.includes("viewBox"), false);
+  assert.equal(scheme.includes("scheme-hit"), false);
+  assert.equal(scheme.includes("scheme-crit-mark"), false);
+  assert.match(scheme, /images\/schemes\/toyota-camry-2010-top\.png/);
   assert.match(css, /#0b1f33/);
   assert.equal(css.includes("#f3efe6"), false);
   assert.equal(css.includes("#2c2418"), false);
@@ -564,39 +566,82 @@ test("final score sits after category buttons and uses completion labels", () =>
   assert.match(app, /Выберите раздел/);
 });
 
-test("scheme shows recognizable top and side car views", () => {
-  const top = carTopSvg({ geometryCritical: true });
-  const side = carSideSvg({ geometryCritical: false });
-  assert.match(top, /Вид автомобиля сверху/);
-  assert.match(side, /Вид автомобиля сбоку/);
-  for (const slug of ["hodovaya", "body", "engine", "electric", "interior", "geometry", "wheels"]) {
-    assert.match(top, new RegExp(`data-select-dir="${slug}"`));
-    assert.match(side, new RegExp(`data-select-dir="${slug}"`));
-  }
-  assert.match(top, /scheme-crit-mark/);
-  assert.equal(side.includes("scheme-crit-mark"), false);
+function pngSize(buf) {
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+test("scheme uses sourced real-car drawings without homemade paths or damage overlays", () => {
+  const root = fileURLToPath(new URL("..", import.meta.url));
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(app, /carTopSvg/);
-  assert.match(app, /carSideSvg/);
-  assert.match(app, /scheme-view-title">Вид сверху/);
-  assert.match(app, /scheme-view-title">Вид сбоку/);
+  const scheme = readFileSync(fileURLToPath(new URL("../js/scheme.js", import.meta.url)), "utf8");
+  const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
+  const readme = readFileSync(fileURLToPath(new URL("../images/schemes/README.md", import.meta.url)), "utf8");
+
+  assert.equal(scheme.includes("export function carTopSvg"), false);
+  assert.equal(scheme.includes("export function carSideSvg"), false);
+  assert.equal(scheme.includes("scheme-crit-mark"), false);
+  assert.equal(scheme.includes("data-select-dir"), false);
+  assert.equal(/d="M\d+/.test(scheme), false);
+  assert.equal(app.includes("carTopSvg"), false);
+  assert.equal(app.includes("carSideSvg"), false);
+  assert.equal(app.includes("На схеме отмечено"), false);
+  assert.match(app, /Схема кузова — не карта повреждений/);
+  assert.match(app, /Источник схемы/);
+  assert.match(app, /Передняя часть/);
+  assert.match(app, /scheme-view-title/);
+  assert.match(app, /"Вид сверху"/);
+  assert.match(app, /"Вид сбоку"/);
+  assert.match(app, /schemeCriticalNoteHTML/);
+  assert.match(app, /Критичное замечание:/);
+
+  const sedan = schemeForCar({ id: "primer-sedan", bodyType: "sedan", model: "Седан А" });
+  const wagon = schemeForCar({ id: "primer-universal", bodyType: "wagon", model: "Универсал Б" });
+  const crossover = schemeForCar({ id: "primer-crossover", bodyType: "crossover", model: "Кроссовер В" });
+  assert.equal(schemeKindForCar({ bodyType: "sedan" }), "sedan");
+  assert.equal(schemeKindForCar({ bodyType: "wagon" }), "wagon");
+  assert.equal(schemeKindForCar({ bodyType: "crossover" }), "crossover");
+  assert.match(sedan.title, /Toyota Camry/);
+  assert.match(sedan.title, /седан/);
+  assert.match(wagon.title, /Subaru Outback/);
+  assert.match(wagon.title, /универсал/);
+  assert.match(crossover.title, /Range Rover Evoque/);
+  assert.match(crossover.title, /кроссовер/);
+  assert.notEqual(sedan.top.src, wagon.top.src);
+  assert.notEqual(sedan.top.src, crossover.top.src);
+  assert.notEqual(wagon.top.src, crossover.top.src);
+
+  for (const item of listSchemeAssets()) {
+    for (const view of [item.top, item.side]) {
+      const file = new URL(`../${view.src}`, import.meta.url);
+      const buf = readFileSync(file);
+      assert.ok(buf.length > 80_000, `${view.src} too small`);
+      const size = pngSize(buf);
+      assert.equal(size.width, view.width);
+      assert.equal(size.height, view.height);
+      assert.ok(size.width >= 1600, `${view.src} too narrow`);
+      assert.ok(size.height >= 500, `${view.src} too short`);
+    }
+    assert.match(readme, new RegExp(item.source.patent));
+    assert.match(readme, new RegExp(item.source.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("mobile scheme stays stacked and visible without leftover tab-hide rules", () => {
   const css = readFileSync(fileURLToPath(new URL("../css/app.css", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
   assert.match(css, /\.scheme-panel\s*\{[^}]*display:\s*block/s);
-  assert.match(css, /\.scheme-svg\s*\{[^}]*width:\s*100%/s);
-  assert.match(css, /\.scheme-svg\s*\{[^}]*height:\s*auto/s);
-  assert.match(css, /\.scheme-svg\s*\{[^}]*min-height:\s*148px/s);
-  assert.match(css, /aspect-ratio:\s*760 \/ 360/);
-  assert.match(css, /aspect-ratio:\s*760 \/ 300/);
+  assert.match(css, /\.scheme-photo\s*\{[^}]*width:\s*100%/s);
+  assert.match(css, /\.scheme-photo\s*\{[^}]*height:\s*auto/s);
+  assert.match(css, /\.scheme-photo\s*\{[^}]*object-fit:\s*contain/s);
   assert.equal(css.includes(".scheme-panel { display: none; }"), false);
   assert.equal(css.includes(".scheme-panel.is-active"), false);
   assert.equal(/@media \(max-width: 719px\)[\s\S]*?\.scheme-panel\s*\{\s*display:\s*none/.test(css), false);
   assert.equal(css.includes("scheme-tabs { display: none; }"), false);
-  assert.match(app, /scheme-view-title">Вид сверху/);
-  assert.match(app, /scheme-view-title">Вид сбоку/);
+  assert.equal(css.includes(".scheme-svg"), false);
+  assert.equal(css.includes(".scheme-hit"), false);
+  assert.match(app, /scheme-view-title/);
+  assert.match(app, /"Вид сверху"/);
+  assert.match(app, /"Вид сбоку"/);
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function bindSchemeTabs"), false);
   assert.match(app, /Выберите раздел, чтобы посмотреть оценки, замечания и фото/);
@@ -611,8 +656,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108g/);
-  assert.match(sw, /scheme\.js\?v=20261108g/);
+  assert.match(sw, /access\.js\?v=20261108h/);
+  assert.match(sw, /scheme\.js\?v=20261108h/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");

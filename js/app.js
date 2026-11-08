@@ -1,13 +1,13 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108g";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108g";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108g";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108g";
-import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108g";
-import { directionThumb } from "./icons.js?v=20261108g";
-import { folderKey } from "./folder.js?v=20261108g";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108g";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108g";
-import { carTopSvg, carSideSvg } from "./scheme.js?v=20261108g";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108h";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108h";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108h";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108h";
+import { summarizeDirection, summarizeOverall, directionTitle, conditionFromScore, inspectionProgress, severityClass } from "./summary.js?v=20261108h";
+import { directionThumb } from "./icons.js?v=20261108h";
+import { folderKey } from "./folder.js?v=20261108h";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108h";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108h";
+import { schemeForCar } from "./scheme.js?v=20261108h";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -17,8 +17,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108g";
-import { ASSET_VERSION } from "./version.js?v=20261108g";
+} from "./media.js?v=20261108h";
+import { ASSET_VERSION } from "./version.js?v=20261108h";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -444,36 +444,43 @@ function printAllHTML(carId, dirs) {
     .join("")}</div>`;
 }
 
-function schemeLabelsHTML(dirs, carId) {
-  return dirs
-    .map((direction) => {
-      const summary = summaryForDirection(carId, direction);
-      const title = directionTitle(direction.slug, direction.name);
-      return `<li><button type="button" class="scheme-hot ${severityClass(summary)}" data-select-dir="${direction.slug}" aria-haspopup="dialog" aria-controls="categoryDialog" aria-expanded="false">${escapeHtml(title)}</button></li>`;
-    })
-    .join("");
+function schemePhotoHTML(view, label) {
+  return `<section class="scheme-panel">
+        <h3 class="scheme-view-title">${label}</h3>
+        <button type="button" class="scheme-zoom" data-scheme-zoom="${view.src}" data-scheme-alt="${escapeHtml(view.alt)}" aria-label="${escapeHtml(label)}: увеличить" aria-haspopup="dialog" aria-controls="schemeZoomDialog">
+          <span class="scheme-frame">
+            <img class="scheme-photo" src="${view.src}" width="${view.width}" height="${view.height}" alt="${escapeHtml(view.alt)}">
+            <span class="scheme-front-tag">Передняя часть</span>
+          </span>
+        </button>
+      </section>`;
 }
 
-function carSchemeHTML(carId, dirs) {
-  const geometryDir = dirs.find((item) => item.slug === "geometry") || { slug: "geometry", checkpoints: [] };
-  const geometryCritical = Boolean(summaryForDirection(carId, geometryDir).hasCritical);
-  const zoneClassMap = Object.fromEntries(
-    dirs.map((direction) => [direction.slug, direction.slug === "geometry" && geometryCritical ? "has-critical" : ""]),
-  );
+function schemeCriticalNoteHTML(carId) {
+  const overview = overviewFor(carId);
+  if (overview.unpublished) return "";
+  const faults = overview.scores?.criticalFaults || [];
+  if (!faults.length) return "";
+  const items = faults.map((item) => `${escapeHtml(item.name)} — ${item.score}/10`).join("; ");
+  return `<p class="scheme-crit-note">Критичное замечание: ${items}.</p>`;
+}
+
+function carSchemeHTML(carId) {
+  const car = SAMPLE_CARS.find((item) => item.id === carId) || { id: carId };
+  const scheme = schemeForCar(car);
   return `<figure class="car-scheme">
-    <figcaption>Схема автомобиля</figcaption>
+    <figcaption>${escapeHtml(scheme.title)}</figcaption>
+    <p class="scheme-caption-note">Схема кузова — не карта повреждений</p>
     <div class="scheme-views">
-      <section class="scheme-panel" data-scheme-panel="top">
-        <h3 class="scheme-view-title">Вид сверху</h3>
-        ${carTopSvg({ zoneClassMap, geometryCritical })}
-      </section>
-      <section class="scheme-panel" data-scheme-panel="side">
-        <h3 class="scheme-view-title">Вид сбоку</h3>
-        ${carSideSvg({ zoneClassMap, geometryCritical })}
-      </section>
+      ${schemePhotoHTML(scheme.top, "Вид сверху")}
+      ${schemePhotoHTML(scheme.side, "Вид сбоку")}
     </div>
-    ${geometryCritical ? `<p class="scheme-crit-note">На схеме отмечено критичное замечание в разделе «Геометрия / Лонжероны» — по данным осмотра, не выдуманная метка повреждения.</p>` : ""}
-    <p class="hint">Нажмите на часть машины — откроется тот же раздел, что и кнопка ниже. Это схема, а не карта царапин.</p>
+    ${schemeCriticalNoteHTML(carId)}
+    <p class="scheme-source">Источник схемы: <a href="${scheme.source.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(scheme.source.short)}</a></p>
+    <dialog id="schemeZoomDialog" class="scheme-zoom-dialog">
+      <form method="dialog"><button type="submit" class="btn ghost" id="schemeZoomClose">Закрыть</button></form>
+      <img alt="">
+    </dialog>
   </figure>`;
 }
 
@@ -636,7 +643,7 @@ function renderCar(id, route = parseRoute()) {
           </dl>
           ${overallHero(id)}
         </div>
-        ${carSchemeHTML(id, dirs)}
+        ${carSchemeHTML(id)}
       </section>
       ${unpublished ? unpublishedBlock(car) : ""}
       ${unpublished ? "" : `<p class="formula">${FORMULA_DISCLAIMER}</p>`}
@@ -1210,8 +1217,22 @@ if (typeof window !== "undefined") {
   });
 }
 
+function bindSchemeZoom() {
+  const dialog = document.getElementById("schemeZoomDialog");
+  const img = dialog?.querySelector("img");
+  if (!dialog || !img) return;
+  document.querySelectorAll("[data-scheme-zoom]").forEach((button) => {
+    button.addEventListener("click", () => {
+      img.src = button.getAttribute("data-scheme-zoom");
+      img.alt = button.getAttribute("data-scheme-alt") || "Схема автомобиля";
+      if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
+    });
+  });
+}
+
 function bind() {
   bindSheetDialog();
+  bindSchemeZoom();
   bindFieldRoot(document);
   bindMediaSection(document);
   document.getElementById("sharePage")?.addEventListener("click", () => {

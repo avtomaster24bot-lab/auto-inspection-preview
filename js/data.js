@@ -1,4 +1,4 @@
-import { computeScores } from "./scoring.js?v=20261108g";
+import { computeScores } from "./scoring.js?v=20261108h";
 
 export const DIRECTIONS = [
   {
@@ -286,6 +286,7 @@ export const SAMPLE_CARS = [
     label: "Демо-образец 1",
     make: "ПримерМарка",
     model: "Седан А",
+    bodyType: "sedan",
     year: 2019,
     mileage: 87400,
     color: "графитовый (пример цвета)",
@@ -302,6 +303,7 @@ export const SAMPLE_CARS = [
     label: "Демо-образец 2",
     make: "ПримерМарка",
     model: "Универсал Б",
+    bodyType: "wagon",
     year: 2016,
     mileage: 142300,
     color: "синий (пример цвета)",
@@ -318,6 +320,7 @@ export const SAMPLE_CARS = [
     label: "Демо-образец 3",
     make: "ПримерМарка",
     model: "Кроссовер В",
+    bodyType: "crossover",
     year: 2021,
     mileage: 31200,
     color: "белый (пример цвета)",
