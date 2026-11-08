@@ -1,4 +1,4 @@
-import { computeScores } from "./scoring.js?v=20261108m";
+import { computeScores } from "./scoring.js?v=20261108n";
 
 export const DIRECTIONS = [
   {

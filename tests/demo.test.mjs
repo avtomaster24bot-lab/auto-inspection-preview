@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108m/);
-  assert.match(sw, /scheme\.js\?v=20261108m/);
+  assert.match(sw, /access\.js\?v=20261108n/);
+  assert.match(sw, /scheme\.js\?v=20261108n/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,8 +824,8 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108m/);
-  assert.match(sw, /diagrams\.js\?v=20261108m/);
+  assert.match(sw, /defects\.js\?v=20261108n/);
+  assert.match(sw, /diagrams\.js\?v=20261108n/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
 
@@ -835,7 +835,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(html, /css\/comic\.css\?v=20261108m/);
+  assert.match(html, /css\/comic\.css\?v=20261108n/);
   assert.match(comic, /@font-face/);
   assert.match(comic, /font-family:\s*"Russo One"/);
   assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
@@ -844,7 +844,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
   assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
   assert.match(comic, /U\+0400/);
-  assert.match(sw, /css\/comic\.css\?v=20261108m/);
+  assert.match(sw, /css\/comic\.css\?v=20261108n/);
   assert.match(sw, /fonts\/russo-one\.woff2/);
   assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
   assert.match(sw, /fonts\/manrope-variable\.woff2/);
@@ -859,7 +859,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(app, /"Схема"/);
   assert.match(app, /"Проверки"/);
   assert.match(app, /"Итог"/);
-  assert.match(app, /разделов проверки/);
+  assert.match(app, /formatRuCount\(sections, "раздел", "раздела", "разделов"\)\} проверки/);
 });
 
 test("prefers-reduced-motion disables decorative motion", () => {
@@ -932,8 +932,14 @@ import {
   listingUrlError,
   loadBrief,
   saveBrief,
+  sanitizeBrief,
+  sanitizeCurrency,
   sanitizeListingUrl,
+  formatBudgetDisplay,
+  defaultCurrencySelect,
+  parseBudgetAmount,
 } from "../js/brief.js";
+import { nounHelper, formatRuCount } from "../js/format.js";
 test("service journeys have routes, a local brief and a manual WhatsApp draft", () => {
   assert.equal(parseRoute("#/podbor").name, "podbor");
   assert.equal(parseRoute("#/proverit").name, "proverit");
@@ -1000,9 +1006,64 @@ test("service journeys have routes, a local brief and a manual WhatsApp draft", 
   assert.match(app, /нужна отдельная проверка/);
   assert.match(app, /function renderHow/);
   assert.match(app, /HOW_BLURBS/);
-  assert.match(sw, /brief\.js\?v=20261108m/);
+  assert.match(sw, /brief\.js\?v=20261108n/);
   assert.equal(app.includes("Автопрагмат"), false);
   assert.equal(app.includes("autopragmat"), false);
   assert.equal(app.includes("74951201738"), false);
   assert.equal(app.includes("asafev"), false);
+});
+
+test("Russian count nouns follow пункт/пункта/пунктов", () => {
+  const word = nounHelper("пункт", "пункта", "пунктов");
+  assert.equal(word(1), "пункт");
+  assert.equal(word(2), "пункта");
+  assert.equal(word(5), "пунктов");
+  assert.equal(word(11), "пунктов");
+  assert.equal(word(21), "пункт");
+  assert.equal(word(91), "пункт");
+  assert.equal(formatRuCount(1, "пункт", "пункта", "пунктов"), "1 пункт");
+  assert.equal(formatRuCount(21, "пункт", "пункта", "пунктов"), "21 пункт");
+  assert.equal(formatRuCount(91, "пункт", "пункта", "пунктов"), "91 пункт");
+  assert.equal(formatRuCount(7, "раздел", "раздела", "разделов"), "7 разделов");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(app, /formatRuCount\([^)]*"пункт", "пункта", "пунктов"\)/);
+  assert.equal(app.includes("91 пункта"), false);
+  assert.equal(app.includes("${direction.checkpoints.length} пунктов"), false);
+});
+
+test("brief currency round-trips and leaves legacy briefs unspecified", () => {
+  const store = {
+    data: {},
+    getItem(key) { return Object.hasOwn(this.data, key) ? this.data[key] : null; },
+    setItem(key, value) { this.data[key] = String(value); },
+    removeItem(key) { delete this.data[key]; },
+  };
+  const saved = saveBrief({ journey: "podbor", budget: "8000000", currency: "KZT" }, store);
+  assert.equal(saved.currency, "KZT");
+  assert.equal(loadBrief(store).currency, "KZT");
+  const shown = formatBudgetDisplay(saved);
+  assert.match(shown, /8[\s\u00a0\u202f]000[\s\u00a0\u202f]000/);
+  assert.match(shown, /KZT/);
+  const wa = buildBriefWhatsAppMessage(saved);
+  assert.match(wa, /8[\s\u00a0\u202f]000[\s\u00a0\u202f]000/);
+  assert.match(wa, /KZT/);
+  assert.equal(wa.includes("Бюджет: 0\n") || wa.endsWith("Бюджет: 0"), false);
+
+  const legacy = sanitizeBrief({ journey: "podbor", budget: "1500000" });
+  assert.equal(legacy.currency, "");
+  assert.match(formatBudgetDisplay(legacy), /Валюта не указана/);
+  assert.equal(sanitizeCurrency("EUR"), "");
+  assert.equal(sanitizeCurrency("RUB"), "RUB");
+  assert.equal(parseBudgetAmount(""), null);
+  assert.equal(parseBudgetAmount("до 8 млн"), null);
+  assert.equal(formatBudgetDisplay({ budget: "", currency: "KZT" }), "");
+  assert.equal(defaultCurrencySelect({ budget: "", currency: "" }), "KZT");
+  assert.equal(defaultCurrencySelect({ budget: "1000", currency: "" }), "");
+  assert.equal(defaultCurrencySelect({ budget: "1000", currency: "USD" }), "USD");
+
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  assert.match(app, /setCustomValidity/);
+  assert.match(app, /addEventListener\("invalid"/);
+  assert.match(app, /addEventListener\("input"/);
+  assert.match(app, /name="currency"/);
 });

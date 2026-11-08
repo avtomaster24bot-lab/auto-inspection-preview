@@ -1,23 +1,26 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108m";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108m";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108m";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108n";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108n";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108n";
 import {
   HOW_BLURBS,
   bodyPrefLabel,
   buildWhatsAppBriefUrl,
   clearBrief,
+  defaultCurrencySelect,
+  formatBudgetDisplay,
   listingUrlError,
   loadBrief,
   saveBrief,
-} from "./brief.js?v=20261108m";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108m";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108m";
-import { directionThumb } from "./icons.js?v=20261108m";
-import { folderKey } from "./folder.js?v=20261108m";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108m";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108m";
-import { schemeForCar } from "./scheme.js?v=20261108m";
-import { diagramsForDirection } from "./diagrams.js?v=20261108m";
+} from "./brief.js?v=20261108n";
+import { formatRuCount } from "./format.js?v=20261108n";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108n";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108n";
+import { directionThumb } from "./icons.js?v=20261108n";
+import { folderKey } from "./folder.js?v=20261108n";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108n";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108n";
+import { schemeForCar } from "./scheme.js?v=20261108n";
+import { diagramsForDirection } from "./diagrams.js?v=20261108n";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -31,7 +34,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108m";
+} from "./defects.js?v=20261108n";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -41,8 +44,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108m";
-import { ASSET_VERSION } from "./version.js?v=20261108m";
+} from "./media.js?v=20261108n";
+import { ASSET_VERSION } from "./version.js?v=20261108n";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -995,6 +998,18 @@ function carCard(car) {
 }
 
 
+function currencyOptions(brief) {
+  const selected = defaultCurrencySelect(brief);
+  return [
+    ["", "Валюта не указана"],
+    ["KZT", "KZT — тенге"],
+    ["RUB", "RUB — рубли"],
+    ["USD", "USD — доллары"],
+  ]
+    .map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`)
+    .join("");
+}
+
 function bodyPrefOptions(current) {
   return [
     ["", "Не указан"],
@@ -1008,6 +1023,9 @@ function bodyPrefOptions(current) {
 }
 
 function journeyCardsHTML() {
+  const { sections, points } = inspectionScope();
+  const sectionsLabel = formatRuCount(sections, "раздел", "раздела", "разделов");
+  const pointsLabel = formatRuCount(points, "пункт", "пункта", "пунктов");
   return `<section class="journey-board" aria-labelledby="journeyTitle">
       <h2 id="journeyTitle">С чего начать</h2>
       <p class="lead">Три понятных пути: подбор по задачам, проверка найденного объявления или учебные проверенные авто.</p>
@@ -1020,7 +1038,7 @@ function journeyCardsHTML() {
         <a class="journey-card" href="#/proverit">
           <span class="journey-num" aria-hidden="true">2</span>
           <h3>Проверить выбранное авто</h3>
-          <p>Есть объявление? Оставьте ссылку и посмотрите, как выглядит наш осмотр из 7 разделов и 91 пункта.</p>
+          <p>Есть объявление? Оставьте ссылку и посмотрите, как выглядит наш осмотр из ${sectionsLabel} и ${pointsLabel}.</p>
         </a>
         <a class="journey-card" href="#catalog">
           <span class="journey-num" aria-hidden="true">3</span>
@@ -1069,7 +1087,10 @@ function renderPodbor() {
       <form class="service-form" id="serviceBrief">
         <input type="hidden" name="journey" value="podbor">
         <label>Бюджет
-          <input type="text" name="budget" maxlength="80" value="${escapeHtml(brief.budget)}" placeholder="Например: до 8 млн ₸">
+          <input type="text" name="budget" maxlength="80" value="${escapeHtml(brief.budget)}" placeholder="Например: 8000000">
+        </label>
+        <label>Валюта
+          <select name="currency">${currencyOptions(brief)}</select>
         </label>
         <label>Тип кузова
           <select name="bodyPref">${bodyPrefOptions(brief.bodyPref)}</select>
@@ -1096,7 +1117,7 @@ function renderProverit() {
         <span>Проверить выбранное авто</span>
       </nav>
       <h1>Проверить выбранное авто</h1>
-      <p class="lead">Если вы уже нашли объявление, оставьте ссылку и коротко напишите, что смущает. Затем посмотрите учебный осмотр из 7 разделов — так выглядит наш оценочный лист.</p>
+      <p class="lead">Если вы уже нашли объявление, оставьте ссылку и коротко напишите, что смущает. Затем посмотрите учебный осмотр из ${formatRuCount(inspectionScope().sections, "раздел", "раздела", "разделов")} — так выглядит наш оценочный лист.</p>
       ${briefHonestNote()}
       <form class="service-form" id="serviceBrief">
         <input type="hidden" name="journey" value="inspect">
@@ -1131,7 +1152,7 @@ function renderBriefReview() {
   const wa = buildWhatsAppBriefUrl(brief);
   const rows = [
     ["Запрос", title],
-    ["Бюджет", brief.budget],
+    ["Бюджет", formatBudgetDisplay(brief)],
     ["Тип кузова", bodyPrefLabel(brief.bodyPref)],
     ["Пожелания", brief.preferences],
     ["Объявление", brief.listingUrl],
@@ -1176,7 +1197,7 @@ function renderHow() {
           <span class="how-num" aria-hidden="true">${index + 1}</span>
           <div>
             <h3>${escapeHtml(title)}</h3>
-            <p>${direction.checkpoints.length} пунктов. ${escapeHtml(blurb)}</p>
+            <p>${formatRuCount(direction.checkpoints.length, "пункт", "пункта", "пунктов")}. ${escapeHtml(blurb)}</p>
           </div>
         </li>`;
     })
@@ -1189,7 +1210,7 @@ function renderHow() {
         <span>Как проверяем</span>
       </nav>
       <h1>Как мы проверяем автомобиль</h1>
-      <p class="lead">Главное в сервисе — понятный оценочный лист: ${sections} разделов и ${points} пунктов, фото, схемы и отметки дефектов. Это не рыночная оценка и не автоматическая юридическая проверка.</p>
+      <p class="lead">Главное в сервисе — понятный оценочный лист: ${formatRuCount(sections, "раздел", "раздела", "разделов")} и ${formatRuCount(points, "пункт", "пункта", "пунктов")}, фото, схемы и отметки дефектов. Это не рыночная оценка и не автоматическая юридическая проверка.</p>
       ${briefHonestNote()}
       <ol class="how-list">${items}</ol>
       <div class="row">
@@ -1211,8 +1232,8 @@ function renderHome() {
       <section class="welcome-hero" aria-labelledby="welcomeTitle">
         <div class="comic-cover">
           ${carPhoto(cover, "comic-cover-art")}
-          <p class="comic-sticker comic-sticker-gold">${sections} разделов проверки</p>
-          <p class="comic-sticker comic-sticker-cyan">${points} пункт</p>
+          <p class="comic-sticker comic-sticker-gold">${formatRuCount(sections, "раздел", "раздела", "разделов")} проверки</p>
+          <p class="comic-sticker comic-sticker-cyan">${formatRuCount(points, "пункт", "пункта", "пунктов")}</p>
         </div>
         <div class="welcome-copy">
           <p class="chapter-kicker">${escapeHtml(BRAND_FULL)}</p>
@@ -1934,6 +1955,21 @@ function bind() {
     }
   });
   document.getElementById("printReport")?.addEventListener("click", () => window.print());
+  const listingFieldInit = document.querySelector("#serviceBrief [name=\"listingUrl\"]");
+  if (listingFieldInit) {
+    listingFieldInit.addEventListener("input", () => {
+      listingFieldInit.setCustomValidity("");
+      const errBox = document.getElementById("briefFormError");
+      if (errBox) {
+        errBox.hidden = true;
+        errBox.textContent = "";
+      }
+    });
+    listingFieldInit.addEventListener("invalid", () => {
+      const urlErr = listingUrlError(listingFieldInit.value) || (listingFieldInit.validity.typeMismatch ? "Проверьте ссылку на объявление" : "");
+      listingFieldInit.setCustomValidity(urlErr);
+    });
+  }
   document.getElementById("serviceBrief")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1941,7 +1977,9 @@ function bind() {
     const errBox = document.getElementById("briefFormError");
     if (listingField) {
       const urlErr = listingUrlError(listingField.value);
+      listingField.setCustomValidity(urlErr);
       if (urlErr) {
+        listingField.reportValidity();
         if (errBox) {
           errBox.hidden = false;
           errBox.textContent = urlErr;
@@ -1953,6 +1991,7 @@ function bind() {
     const current = loadBrief();
     const next = { ...current, journey: form.elements.namedItem("journey")?.value || current.journey };
     if (form.elements.namedItem("budget")) next.budget = form.elements.namedItem("budget").value;
+    if (form.elements.namedItem("currency")) next.currency = form.elements.namedItem("currency").value;
     if (form.elements.namedItem("bodyPref")) next.bodyPref = form.elements.namedItem("bodyPref").value;
     if (form.elements.namedItem("preferences")) next.preferences = form.elements.namedItem("preferences").value;
     if (listingField) next.listingUrl = listingField.value;

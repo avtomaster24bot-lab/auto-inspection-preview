@@ -1,5 +1,5 @@
-import { getStorage } from "./storage.js?v=20261108m";
-import { DEFAULT_WHATSAPP_DIGITS, normalizeKzWhatsAppNumber } from "./whatsapp.js?v=20261108m";
+import { getStorage } from "./storage.js?v=20261108n";
+import { DEFAULT_WHATSAPP_DIGITS, normalizeKzWhatsAppNumber } from "./whatsapp.js?v=20261108n";
 
 export const BRIEF_STORAGE_KEY = "am24-tradein-demo-brief-v1";
 
@@ -17,11 +17,14 @@ function stripControls(value) {
   return String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").trim();
 }
 
+export const BRIEF_CURRENCIES = ["KZT", "RUB", "USD"];
+
 export function emptyBrief(journey = "") {
   return {
     version: 1,
     journey: journey === "inspect" || journey === "podbor" ? journey : "",
     budget: "",
+    currency: "",
     bodyPref: "",
     preferences: "",
     listingUrl: "",
@@ -31,6 +34,36 @@ export function emptyBrief(journey = "") {
 
 export function sanitizeBudget(value) {
   return stripControls(value).slice(0, 80);
+}
+
+export function sanitizeCurrency(value) {
+  return BRIEF_CURRENCIES.includes(value) ? value : "";
+}
+
+export function parseBudgetAmount(value) {
+  const raw = sanitizeBudget(value);
+  if (!raw) return null;
+  const normalized = raw.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+export function formatBudgetDisplay(brief = {}) {
+  const text = sanitizeBudget(brief.budget);
+  const currency = sanitizeCurrency(brief.currency);
+  const amount = parseBudgetAmount(text);
+  if (!text && amount === null) return "";
+  const numberText = amount === null ? text : new Intl.NumberFormat("ru-RU").format(amount);
+  if (currency) return `${numberText} ${currency}`;
+  return `${numberText} (Валюта не указана)`;
+}
+
+export function defaultCurrencySelect(brief = {}) {
+  const currency = sanitizeCurrency(brief.currency);
+  if (currency) return currency;
+  if (sanitizeBudget(brief.budget)) return "";
+  return "KZT";
 }
 
 export function sanitizeNotes(value) {
@@ -71,6 +104,7 @@ export function sanitizeBrief(input = {}) {
     version: 1,
     journey,
     budget: sanitizeBudget(input.budget),
+    currency: sanitizeCurrency(input.currency),
     bodyPref: sanitizeBodyPref(input.bodyPref),
     preferences: sanitizeNotes(input.preferences),
     listingUrl: sanitizeListingUrl(input.listingUrl),
@@ -113,7 +147,8 @@ export function buildBriefWhatsAppMessage(brief) {
   const lines = ["Здравствуйте! Это учебная заявка с сайта Авто Лидер."];
   if (clean.journey === "podbor") lines.push("Хочу подобрать автомобиль под свои задачи.");
   if (clean.journey === "inspect") lines.push("Хочу обсудить проверку выбранного автомобиля.");
-  if (clean.budget) lines.push(`Бюджет: ${clean.budget}`);
+  const budgetLine = formatBudgetDisplay(clean);
+  if (budgetLine) lines.push(`Бюджет: ${budgetLine}`);
   const body = bodyPrefLabel(clean.bodyPref);
   if (body) lines.push(`Тип кузова: ${body}`);
   if (clean.preferences) lines.push(`Пожелания: ${clean.preferences}`);

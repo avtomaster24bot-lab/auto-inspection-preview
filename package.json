@@ -6,6 +6,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/demo.test.mjs",
-    "check": "node --check js/scoring.js && node --check js/whatsapp.js && node --check js/storage.js && node --check js/data.js && node --check js/summary.js && node --check js/icons.js && node --check js/folder.js && node --check js/media.js && node --check js/routes.js && node --check js/access.js && node --check js/scheme.js && node --check js/defects.js && node --check js/diagrams.js && node --check js/brief.js && node --check js/app.js && node --check tests/demo.test.mjs"
+    "check": "node --check js/scoring.js && node --check js/whatsapp.js && node --check js/storage.js && node --check js/data.js && node --check js/summary.js && node --check js/icons.js && node --check js/folder.js && node --check js/media.js && node --check js/routes.js && node --check js/access.js && node --check js/scheme.js && node --check js/defects.js && node --check js/diagrams.js && node --check js/brief.js && node --check js/format.js && node --check js/app.js && node --check tests/demo.test.mjs"
   }
 }
