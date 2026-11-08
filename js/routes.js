@@ -51,3 +51,22 @@ export function hashDirFromOpen(openDirs, preferred = null) {
   const first = openDirs.values().next();
   return first.done ? null : first.value;
 }
+
+export function pageAnchorId(hash = "") {
+  const raw = String(hash || "").replace(/^#/, "");
+  if (raw === "catalog" || raw === "/catalog") return "catalog";
+  return "";
+}
+
+export function pageKey(hash = "") {
+  if (pageAnchorId(hash)) return "catalog";
+  const route = parseRoute(hash);
+  if (isCarRoute(route) && route.id) return `car:${route.id}`;
+  if (route?.name) return route.name;
+  return "home";
+}
+
+export function shouldResetWindowScroll(fromHash, toHash) {
+  if (pageAnchorId(toHash)) return false;
+  return pageKey(fromHash) !== pageKey(toHash);
+}

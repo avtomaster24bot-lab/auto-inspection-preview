@@ -256,7 +256,7 @@ test("ensureCarShape adds direction notes without wiping scores", () => {
 
 import { existsSync, statSync } from "node:fs";
 import { DIRECTION_IMAGES } from "../js/icons.js";
-import { parseRoute, canonicalHash, isCarRoute } from "../js/routes.js";
+import { parseRoute, canonicalHash, isCarRoute, pageKey, pageAnchorId, shouldResetWindowScroll } from "../js/routes.js";
 
 test("report and inspect hashes stay compatible with the car dossier", () => {
   const report = parseRoute("#/report/primer-sedan/hodovaya");
@@ -658,8 +658,8 @@ test("service worker prefers the network so a refresh gets the latest shell", ()
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   assert.match(sw, /skipWaiting/);
   assert.match(sw, /clients\.claim/);
-  assert.match(sw, /access\.js\?v=20261108o/);
-  assert.match(sw, /scheme\.js\?v=20261108o/);
+  assert.match(sw, /access\.js\?v=20261108p/);
+  assert.match(sw, /scheme\.js\?v=20261108p/);
   const fetchHandler = sw.slice(sw.indexOf('self.addEventListener("fetch"'));
   assert.ok(fetchHandler.indexOf("fetch(request)") < fetchHandler.indexOf("caches.match(request)"));
   assert.equal(MEDIA_DB_NAME, "am24-tradein-demo-media-v1");
@@ -824,8 +824,8 @@ test("every category has its own sourced diagram assets", () => {
   assert.equal(app.includes("data-scheme-view"), false);
   assert.equal(app.includes("function condMark"), false);
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
-  assert.match(sw, /defects\.js\?v=20261108o/);
-  assert.match(sw, /diagrams\.js\?v=20261108o/);
+  assert.match(sw, /defects\.js\?v=20261108p/);
+  assert.match(sw, /diagrams\.js\?v=20261108p/);
   assert.match(sw, /images\/diagrams\/hodovaya-chassis\.jpg/);
 });
 
@@ -835,7 +835,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   const html = readFileSync(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
   const sw = readFileSync(fileURLToPath(new URL("../sw.js", import.meta.url)), "utf8");
   const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
-  assert.match(html, /css\/comic\.css\?v=20261108o/);
+  assert.match(html, /css\/comic\.css\?v=20261108p/);
   assert.match(comic, /@font-face/);
   assert.match(comic, /font-family:\s*"Russo One"/);
   assert.match(comic, /font-family:\s*"Balsamiq Sans"/);
@@ -844,7 +844,7 @@ test("comic theme ships licensed local Cyrillic display fonts", () => {
   assert.match(comic, /url\("\.\.\/fonts\/balsamiq-sans-bold\.woff2"\)/);
   assert.match(comic, /url\("\.\.\/fonts\/manrope-variable\.woff2"\)/);
   assert.match(comic, /U\+0400/);
-  assert.match(sw, /css\/comic\.css\?v=20261108o/);
+  assert.match(sw, /css\/comic\.css\?v=20261108p/);
   assert.match(sw, /fonts\/russo-one\.woff2/);
   assert.match(sw, /fonts\/balsamiq-sans-bold\.woff2/);
   assert.match(sw, /fonts\/manrope-variable\.woff2/);
@@ -1008,7 +1008,7 @@ test("service journeys have routes, a local brief and a manual WhatsApp draft", 
   assert.match(app, /нужна отдельная проверка/);
   assert.match(app, /function renderHow/);
   assert.match(app, /HOW_BLURBS/);
-  assert.match(sw, /brief\.js\?v=20261108o/);
+  assert.match(sw, /brief\.js\?v=20261108p/);
   assert.equal(app.includes("Автопрагмат"), false);
   assert.equal(app.includes("autopragmat"), false);
   assert.equal(app.includes("74951201738"), false);
@@ -1098,4 +1098,49 @@ test("landing follows a photo-led service sequence without invented social proof
   assert.equal(home.includes("speech-bubble"), false);
   assert.equal(app.includes("Автопрагмат"), false);
   assert.match(app, /document\.body\.classList\.toggle\("landing-shell"/);
+});
+
+test("landing motto is a plain readable line and page keys reset only top-level entries", () => {
+  const landing = readFileSync(fileURLToPath(new URL("../css/landing.css", import.meta.url)), "utf8");
+  const comic = readFileSync(fileURLToPath(new URL("../css/comic.css", import.meta.url)), "utf8");
+  const app = readFileSync(fileURLToPath(new URL("../js/app.js", import.meta.url)), "utf8");
+  const home = app.slice(app.indexOf("function renderHome"), app.indexOf("function unpublishedBlock"));
+  assert.match(home, /class="lead motto">\$\{BRAND_TAGLINE\}/);
+  const motto = landing.slice(landing.indexOf("body.landing-shell .lead.motto"), landing.indexOf("body.landing-shell .landing-hero-note"));
+  assert.match(motto, /background:\s*transparent/);
+  assert.match(motto, /box-shadow:\s*none/);
+  assert.match(motto, /border:\s*0/);
+  assert.match(motto, /padding:\s*0/);
+  assert.match(motto, /color:\s*#d5d5d5/);
+  assert.match(motto, /\.lead\.motto::before/);
+  assert.match(motto, /\.lead\.motto::after/);
+  assert.match(motto, /content:\s*none/);
+  assert.match(motto, /display:\s*none/);
+  assert.match(comic, /\.lead\.motto\s*\{[^}]*background:\s*#fff/s);
+  assert.match(comic, /\.lead\.motto::before/);
+  assert.match(app, /function revealPageForRoute/);
+  assert.match(app, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+
+  assert.equal(pageKey("#/"), "home");
+  assert.equal(pageKey("#catalog"), "catalog");
+  assert.equal(pageKey("#/catalog"), "catalog");
+  assert.equal(pageKey("#/podbor"), "podbor");
+  assert.equal(pageKey("#/proverit"), "proverit");
+  assert.equal(pageKey("#/brief"), "brief");
+  assert.equal(pageKey("#/kak"), "how");
+  assert.equal(pageKey("#/c/primer-sedan"), "car:primer-sedan");
+  assert.equal(pageKey("#/c/primer-sedan/hodovaya"), "car:primer-sedan");
+  assert.equal(pageKey("#/report/primer-sedan/body"), "car:primer-sedan");
+  assert.equal(pageKey("#/inspect/primer-sedan"), "car:primer-sedan");
+  assert.equal(pageKey("#/c/primer-universal"), "car:primer-universal");
+  assert.equal(pageAnchorId("#catalog"), "catalog");
+  assert.equal(pageAnchorId("#/"), "");
+  assert.equal(pageAnchorId("#/c/primer-sedan"), "");
+  assert.equal(shouldResetWindowScroll("#/", "#/c/primer-sedan"), true);
+  assert.equal(shouldResetWindowScroll("#/c/primer-sedan", "#/c/primer-sedan/hodovaya"), false);
+  assert.equal(shouldResetWindowScroll("#/c/primer-sedan/hodovaya", "#/c/primer-sedan"), false);
+  assert.equal(shouldResetWindowScroll("#/", "#catalog"), false);
+  assert.equal(shouldResetWindowScroll("#catalog", "#/"), true);
+  assert.equal(shouldResetWindowScroll("#/podbor", "#/proverit"), true);
+  assert.equal(shouldResetWindowScroll("#/c/primer-sedan", "#/c/primer-universal"), true);
 });

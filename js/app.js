@@ -1,6 +1,6 @@
-import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108o";
-import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108o";
-import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108o";
+import { DIRECTIONS, DEMO_MASTERS, ROLES, SAMPLE_CARS, createDefaultState, carMeta, liveScoresForCar, ensureCarShape, orderedDirections } from "./data.js?v=20261108p";
+import { FORMULA_DISCLAIMER } from "./scoring.js?v=20261108p";
+import { buildPublicCarUrl, buildWhatsAppBuyUrl } from "./whatsapp.js?v=20261108p";
 import {
   HOW_BLURBS,
   bodyPrefLabel,
@@ -11,16 +11,16 @@ import {
   listingUrlError,
   loadBrief,
   saveBrief,
-} from "./brief.js?v=20261108o";
-import { formatRuCount } from "./format.js?v=20261108o";
-import { loadState, saveState, clearState } from "./storage.js?v=20261108o";
-import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108o";
-import { directionThumb } from "./icons.js?v=20261108o";
-import { folderKey } from "./folder.js?v=20261108o";
-import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash } from "./routes.js?v=20261108o";
-import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108o";
-import { schemeForCar } from "./scheme.js?v=20261108o";
-import { diagramsForDirection } from "./diagrams.js?v=20261108o";
+} from "./brief.js?v=20261108p";
+import { formatRuCount } from "./format.js?v=20261108p";
+import { loadState, saveState, clearState } from "./storage.js?v=20261108p";
+import { summarizeDirection, summarizeOverall, directionTitle, inspectionProgress, severityClass, statusPresentation, nodeStatus } from "./summary.js?v=20261108p";
+import { directionThumb } from "./icons.js?v=20261108p";
+import { folderKey } from "./folder.js?v=20261108p";
+import { parseRoute as parseRouteFromHash, isCarRoute, canonicalHash, pageKey, pageAnchorId } from "./routes.js?v=20261108p";
+import { visibleDirections, canEditDirection, canSeeInternalFor, directionAccess, unpublishedSectionMessage, authorizedOverview, authorizedDirectionScore, authorizedConclusion } from "./access.js?v=20261108p";
+import { schemeForCar } from "./scheme.js?v=20261108p";
+import { diagramsForDirection } from "./diagrams.js?v=20261108p";
 import {
   DEFECT_COLORS,
   DEFECT_SIZES,
@@ -34,7 +34,7 @@ import {
   removeDefect,
   sizeMeta,
   updateDefect,
-} from "./defects.js?v=20261108o";
+} from "./defects.js?v=20261108p";
 import {
   MEDIA_LIMITS_TEXT,
   addFolderMedia,
@@ -44,8 +44,8 @@ import {
   objectUrlFor,
   revokeAllObjectUrls,
   revokeFolderObjectUrls,
-} from "./media.js?v=20261108o";
-import { ASSET_VERSION } from "./version.js?v=20261108o";
+} from "./media.js?v=20261108p";
+import { ASSET_VERSION } from "./version.js?v=20261108p";
 
 const STATUS_LABEL = {
   created: "создан",
@@ -1543,6 +1543,36 @@ function render() {
     const carState = state.cars[route.id];
     const allowed = carState ? visibleDirections().some((item) => item.slug === route.dir) : false;
     if (allowed) openCategoryDialog(route.dir, { updateHash: false });
+  }
+  revealPageForRoute();
+}
+
+let lastPageKey = null;
+
+function focusPageEntry(el) {
+  if (!el || typeof el.focus !== "function") return;
+  if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+  el.focus({ preventScroll: true });
+}
+
+function revealPageForRoute() {
+  const hash = location.hash;
+  const nextKey = pageKey(hash);
+  const changed = lastPageKey === null || lastPageKey !== nextKey;
+  lastPageKey = nextKey;
+  const anchorId = pageAnchorId(hash);
+  if (anchorId) {
+    const el = document.getElementById(anchorId);
+    if (el) {
+      el.scrollIntoView();
+      focusPageEntry(el.querySelector("h1, h2, h3") || el);
+      return;
+    }
+  }
+  if (changed) {
+    window.scrollTo(0, 0);
+    const main = document.querySelector("#app main");
+    focusPageEntry(main?.querySelector("h1") || main);
   }
 }
 

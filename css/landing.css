@@ -280,11 +280,29 @@ body.landing-shell .home-hook {
 }
 
 body.landing-shell .lead.motto {
+  position: static;
+  display: block;
   max-width: 34rem;
-  margin: 0 0 1.5rem;
-  color: #fff;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  background: transparent;
+  background-image: none;
+  color: #d5d5d5;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: none;
   font-size: 1.05rem;
   font-weight: 600;
+  line-height: 1.45;
+}
+body.landing-shell .lead.motto::before,
+body.landing-shell .lead.motto::after {
+  content: none;
+  display: none;
+  border: 0;
+  box-shadow: none;
+  background: none;
 }
 
 body.landing-shell .landing-hero-note .support { margin: 0; color: inherit; }
